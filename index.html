@@ -457,6 +457,10 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         Score with AI
       </button>
+      <button class="btn" id="db-btn" onclick="saveToDBOnly()" style="border-color:var(--accent-blue);color:var(--accent-blue);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Save to DB only
+      </button>
     </div>
 
     <div id="ranker-status" class="status-box"></div>
@@ -526,6 +530,45 @@
 
 <script>
 // All API keys are now server-side in Vercel environment variables
+
+// ── Company DB integration ─────────────────────────────
+const DB_URL = 'https://company-db-agent.vercel.app';
+let dbCache = null; // { byRaw: Map, byNormalized: Map }
+
+async function loadDB() {
+  if (dbCache) return dbCache;
+  try {
+    const res = await fetch(DB_URL + '/api/companies');
+    if (!res.ok) return null;
+    const companies = await res.json();
+    const byRaw = new Map();
+    const byNormalized = new Map();
+    for (const c of companies) {
+      if (c.country) {
+        for (const raw of (c.raw || [])) byRaw.set(raw.toLowerCase().trim(), c);
+        byNormalized.set(c.normalized.toLowerCase().trim(), c);
+      }
+    }
+    dbCache = { byRaw, byNormalized };
+    return dbCache;
+  } catch { return null; }
+}
+
+function lookupInDB(name, db) {
+  if (!db) return null;
+  const key = name.toLowerCase().trim();
+  return db.byRaw.get(key) || db.byNormalized.get(key) || null;
+}
+
+async function syncToDB(companies, source) {
+  try {
+    await fetch(DB_URL + '/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companies, source })
+    });
+  } catch { /* silent — DB sync is best-effort */ }
+}
 
 async function apiFetch(body, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -881,9 +924,21 @@ async function runScoring() {
   const btn = document.getElementById('score-btn');
   btn.disabled = true;
   const topN = parseInt(document.getElementById('target-count').value) || 50;
+  const sourceName = document.getElementById('file-name').textContent.replace(/\.[^.]+$/, '') || 'exporepoapi';
 
-  // Step 1: Enrich companies via PeopleDataLabs
-  setStatus('ranker-status', 'Enriching companies with PeopleDataLabs (0/' + rows.length + ')...', false, true);
+  // Step 1: Check company DB for known countries (free, no PDL credit)
+  setStatus('ranker-status', 'Checking company database...', false, true);
+  const db = await loadDB();
+  rows.forEach(r => {
+    if (!r.country) {
+      const hit = lookupInDB(r.name, db);
+      if (hit?.country) r.country = hit.country;
+    }
+  });
+  const dbHits = rows.filter(r => r.country).length;
+
+  // Step 2: Enrich remaining companies via PeopleDataLabs
+  setStatus('ranker-status', `DB filled ${dbHits} countries. Enriching with PeopleDataLabs...`, false, true);
 
   let enrichedMap = {};
   const batchSize = 20;
@@ -974,6 +1029,18 @@ Exactly ${topN} items maximum.`;
     document.getElementById('results-section').style.display = 'block';
     document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+    // Sync all companies (with enrichment data) back to company DB in background
+    const syncPayload = rows.map(r => {
+      const e = enrichedMap[r.name.toLowerCase().trim()];
+      return {
+        name: r.name,
+        country: r.country || null,
+        employees: e?.employee_count || null,
+        industry: e?.industry || null,
+      };
+    });
+    syncToDB(syncPayload, sourceName);
+
   } catch(err) {
     setStatus('ranker-status', 'Error: ' + err.message, true);
   } finally {
@@ -1015,6 +1082,40 @@ function downloadCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = `expotential_top${rankedData.length}_targets.csv`;
   a.click();
+}
+
+// ── Save to DB only ─────────────────────────────────────
+async function saveToDBOnly() {
+  const colName = document.getElementById('col-name').value;
+  if (!colName) { setStatus('ranker-status', 'Please select the company name column.', true); return; }
+  const colCountry = document.getElementById('col-country').value;
+
+  const rows = parsedRows.map(r => ({
+    name: String(r[colName] || '').trim(),
+    country: colCountry ? String(r[colCountry] || '').trim() : null,
+  })).filter(r => r.name.length > 1);
+
+  if (!rows.length) { setStatus('ranker-status', 'No valid company names found.', true); return; }
+
+  const btn = document.getElementById('db-btn');
+  btn.disabled = true;
+  const sourceName = document.getElementById('file-name').textContent.replace(/\.[^.]+$/, '') || 'exporepoapi';
+  setStatus('ranker-status', `Saving ${rows.length} companies to database...`, false, true);
+
+  try {
+    const res = await fetch('https://company-db-agent.vercel.app/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companies: rows, source: sourceName })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sync failed');
+    setStatus('ranker-status', `✓ Saved to database — ${data.added} new, ${data.updated} updated (${data.total} total)`);
+  } catch(err) {
+    setStatus('ranker-status', 'DB sync error: ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ── LIST GUIDE ─────────────────────────────────────────
