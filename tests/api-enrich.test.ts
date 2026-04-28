@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OPTIONS, POST } from "@/app/api/enrich/route";
+import {
+  DELETE,
+  GET,
+  HEAD,
+  OPTIONS,
+  PATCH,
+  POST,
+  PUT,
+} from "@/app/api/enrich/route";
 
 function buildReq(body: unknown): Request {
   return new Request("http://test/api/enrich", {
@@ -158,5 +166,24 @@ describe("/api/enrich", () => {
       linkedin_url: null,
       tags: [],
     });
+  });
+
+  it.each([
+    ["GET", GET],
+    ["PUT", PUT],
+    ["DELETE", DELETE],
+    ["PATCH", PATCH],
+    ["HEAD", HEAD],
+  ])("%s returns 405 with error body and CORS headers", async (_name, fn) => {
+    const res = await fn();
+    expect(res.status).toBe(405);
+    expect(await res.json()).toEqual({ error: "Method not allowed" });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Methods")).toBe(
+      "POST, OPTIONS",
+    );
+    expect(res.headers.get("Access-Control-Allow-Headers")).toBe(
+      "Content-Type",
+    );
   });
 });

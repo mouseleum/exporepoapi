@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { corsPreflight, jsonWithCors } from "@/lib/cors";
+import { corsPreflight, jsonWithCors, methodNotAllowed } from "@/lib/cors";
 
 const CompanyInputSchema = z.object({
   name: z.string().min(1),
@@ -33,6 +33,12 @@ const BATCH_DELAY_MS = 200;
 export async function OPTIONS(): Promise<Response> {
   return corsPreflight();
 }
+
+export const GET = methodNotAllowed;
+export const PUT = methodNotAllowed;
+export const DELETE = methodNotAllowed;
+export const PATCH = methodNotAllowed;
+export const HEAD = methodNotAllowed;
 
 export async function POST(req: Request): Promise<Response> {
   const apiKey = process.env.PDL_API_KEY;

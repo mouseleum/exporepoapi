@@ -14,3 +14,7 @@ export function jsonWithCors(data: unknown, status = 200): Response {
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
 }
+
+export async function methodNotAllowed(): Promise<Response> {
+  return jsonWithCors({ error: "Method not allowed" }, 405);
+}
