@@ -562,12 +562,20 @@ function lookupInDB(name, db) {
 
 async function syncToDB(companies, source) {
   try {
-    await fetch(DB_URL + '/api/sync', {
+    const res = await fetch(DB_URL + '/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ companies, source })
     });
-  } catch { /* silent — DB sync is best-effort */ }
+    const data = await res.json();
+    if (res.ok) {
+      setStatus('ranker-status', `✓ Synced to company DB — ${data.added} new, ${data.updated} updated (${data.total} total)`);
+    } else {
+      setStatus('ranker-status', `DB sync warning: ${data.error || 'unknown error'}`, true);
+    }
+  } catch (err) {
+    setStatus('ranker-status', `DB sync error: ${err.message}`, true);
+  }
 }
 
 async function apiFetch(body, retries = 2) {
