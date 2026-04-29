@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/Header";
 import { TabBar, type TabId } from "@/components/TabBar";
 import { RankerTab } from "@/components/ranker/RankerTab";
+import { ListGuideTab } from "@/components/guide/ListGuideTab";
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>("ranker");
@@ -38,7 +39,7 @@ export default function HomePage() {
         id="panel-guide"
         className={`panel${activeTab === "guide" ? " active" : ""}`}
       >
-        <div className="hero">
+        <div className="guide-hero">
           <h1>
             How to get
             <br />
@@ -50,7 +51,7 @@ export default function HomePage() {
             ready to drop into the Ranker.
           </p>
         </div>
-        {/* ListGuideTab UI lands here in Step 5 */}
+        <ListGuideTab />
       </div>
     </div>
   );
