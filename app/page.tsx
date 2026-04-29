@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { TabBar, type TabId } from "@/components/TabBar";
+import { RankerTab } from "@/components/ranker/RankerTab";
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>("ranker");
@@ -30,7 +31,7 @@ export default function HomePage() {
             ready-to-use CSV.
           </p>
         </div>
-        {/* RankerTab UI lands here in Step 4 */}
+        <RankerTab />
       </div>
 
       <div
