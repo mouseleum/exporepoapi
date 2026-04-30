@@ -1,25 +1,39 @@
 "use client";
 
-import { useEffect, useReducer } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TopNav } from "@/components/TopNav";
 import { StatusBox } from "@/components/StatusBox";
+import { CountryWeights } from "@/components/ranker/CountryWeights";
+import { TargetCountSlider } from "@/components/ranker/TargetCountSlider";
+import { ResultsTable } from "@/components/ranker/ResultsTable";
 import { EventPicker } from "@/components/library/EventPicker";
 import { ExhibitorPreview } from "@/components/library/ExhibitorPreview";
 import {
   listEvents,
   getEventExhibitors,
 } from "@/app/library/actions";
+import { runScoringPipeline } from "@/lib/scoring-pipeline";
 import type {
   EventListItem,
   LibraryExhibitor,
 } from "@/lib/library/queries";
-import type { Status } from "@/lib/types";
+import type {
+  CountryWeights as CountryWeightsType,
+  EnrichedCompany,
+  ParsedRow,
+  RankedRow,
+  Status,
+} from "@/lib/types";
 
 type State = {
   events: EventListItem[];
   selectedId: string | null;
   exhibitors: LibraryExhibitor[];
+  countryWeights: CountryWeightsType;
+  targetCount: number;
+  rankedData: RankedRow[];
+  isScoring: boolean;
   status: Status;
 };
 
@@ -27,12 +41,21 @@ type Action =
   | { type: "EVENTS_LOADED"; events: EventListItem[] }
   | { type: "EVENT_SELECTED"; id: string }
   | { type: "EXHIBITORS_LOADED"; exhibitors: LibraryExhibitor[] }
-  | { type: "STATUS"; status: Status };
+  | { type: "WEIGHTS_CHANGED"; weights: CountryWeightsType }
+  | { type: "TARGET_CHANGED"; n: number }
+  | { type: "STATUS"; status: Status }
+  | { type: "SCORE_START" }
+  | { type: "SCORE_SUCCESS"; data: RankedRow[] }
+  | { type: "SCORE_END" };
 
 const initialState: State = {
   events: [],
   selectedId: null,
   exhibitors: [],
+  countryWeights: {},
+  targetCount: 50,
+  rankedData: [],
+  isScoring: false,
   status: { kind: "idle" },
 };
 
@@ -45,6 +68,8 @@ function reducer(state: State, action: Action): State {
         ...state,
         selectedId: action.id,
         exhibitors: [],
+        countryWeights: {},
+        rankedData: [],
       };
     case "EXHIBITORS_LOADED":
       return {
@@ -52,13 +77,33 @@ function reducer(state: State, action: Action): State {
         exhibitors: action.exhibitors,
         status: { kind: "idle" },
       };
+    case "WEIGHTS_CHANGED":
+      return { ...state, countryWeights: action.weights };
+    case "TARGET_CHANGED":
+      return { ...state, targetCount: action.n };
     case "STATUS":
       return { ...state, status: action.status };
+    case "SCORE_START":
+      return { ...state, isScoring: true, rankedData: [] };
+    case "SCORE_SUCCESS":
+      return {
+        ...state,
+        rankedData: action.data,
+        status: { kind: "idle" },
+      };
+    case "SCORE_END":
+      return { ...state, isScoring: false };
   }
+}
+
+function csvEscape(v: string | number | null): string {
+  if (v === null) return "";
+  return String(v);
 }
 
 export default function LibraryPage() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,6 +159,94 @@ export default function LibraryPage() {
     };
   }, [state.selectedId]);
 
+  const weightRows: ParsedRow[] = useMemo(
+    () => state.exhibitors.map((e) => ({ country: e.country })),
+    [state.exhibitors],
+  );
+
+  const selectedEvent = state.events.find((e) => e.id === state.selectedId);
+
+  const runScoring = async () => {
+    if (!state.exhibitors.length) return;
+    const event = selectedEvent;
+    if (!event) return;
+
+    const rows = state.exhibitors.map((e) => ({
+      name: e.raw_name,
+      country: e.country,
+      hall: e.hall,
+    }));
+
+    const prefilledEnriched: Record<string, EnrichedCompany> = {};
+    for (const e of state.exhibitors) {
+      if (!e.apollo_matched) continue;
+      const key = e.raw_name.toLowerCase().trim();
+      prefilledEnriched[key] = {
+        name: e.raw_name,
+        matched: true,
+        employee_count: e.employees,
+        employee_range: null,
+        industry: e.industry,
+        revenue_range: null,
+        founded: null,
+        linkedin_url: null,
+        tags: [],
+      };
+    }
+
+    dispatch({ type: "SCORE_START" });
+    try {
+      await runScoringPipeline(
+        rows,
+        {
+          topN: state.targetCount,
+          countryWeights: state.countryWeights,
+          source: event.slug,
+          prefilledEnriched,
+        },
+        {
+          onStatus: (s) => dispatch({ type: "STATUS", status: s }),
+          onResults: (data) => {
+            dispatch({ type: "SCORE_SUCCESS", data });
+            requestAnimationFrame(() => {
+              resultsRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            });
+          },
+        },
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      dispatch({
+        type: "STATUS",
+        status: { kind: "error", message: "Error: " + message },
+      });
+    } finally {
+      dispatch({ type: "SCORE_END" });
+    }
+  };
+
+  const downloadCSV = () => {
+    if (!state.rankedData.length) return;
+    const header = "Rank,Company,Country,Hall/Booth,Employees,Industry,Score\n";
+    const rows = state.rankedData
+      .map(
+        (r) =>
+          `${r.rank},"${csvEscape(r.name)}","${csvEscape(r.country)}","${csvEscape(r.hall)}","${csvEscape(
+            r.employees,
+          )}","${csvEscape(r.industry)}",${r.score}`,
+      )
+      .join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const slug = selectedEvent?.slug ?? "library";
+    a.download = `expotential_${slug}_top${state.rankedData.length}.csv`;
+    a.click();
+  };
+
   return (
     <div className="wrap">
       <Header />
@@ -137,10 +270,51 @@ export default function LibraryPage() {
         onChange={(id) => dispatch({ type: "EVENT_SELECTED", id })}
       />
 
-      <StatusBox status={state.status} />
+      {state.exhibitors.length > 0 && (
+        <div className="col-section">
+          <CountryWeights
+            rows={weightRows}
+            countryColumn="country"
+            weights={state.countryWeights}
+            onChange={(w) =>
+              dispatch({ type: "WEIGHTS_CHANGED", weights: w })
+            }
+          />
+          <TargetCountSlider
+            value={state.targetCount}
+            onChange={(n) => dispatch({ type: "TARGET_CHANGED", n })}
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={state.isScoring}
+            onClick={runScoring}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+            Score with AI
+          </button>
+        </div>
+      )}
 
       {state.exhibitors.length > 0 && (
         <ExhibitorPreview exhibitors={state.exhibitors} />
+      )}
+
+      <StatusBox status={state.status} />
+
+      {state.rankedData.length > 0 && (
+        <div ref={resultsRef}>
+          <ResultsTable data={state.rankedData} onDownload={downloadCSV} />
+        </div>
       )}
     </div>
   );
