@@ -17,7 +17,7 @@ Phased, additive, every phase ends in a working app and a commit:
 1. **DB foundation** — Supabase schema (`db/migrations/0001_companies.sql`, project ref `hihhgpzcklusonxnbfcn`), Apollo CSV bulk loader (`scripts/load-apollo.ts`). ✅ 9 986 rows loaded; loader is idempotent on `apollo_account_id`. Service-role key in `.env.local` only — Vercel env wiring deferred to Phase 4. `company-db-agent` stays parallel for lightweight country lookups.
 2. **Refactor scorer to pure** — source-agnostic, used by both CSV and DB modes.
 3. **First adapter** — generic HTML scraper for cyberseceurope.com (`lib/adapters/cyberseceurope.ts`); defines `Adapter` interface (`lib/adapters/types.ts`) for future platform-specific adapters. New tables `events` + `event_exhibitors` (`db/migrations/0002_events.sql`); loader `pnpm load:event <slug>`. ✅ 194 rows loaded for `cyberseceurope-2026`. Originally scoped as Swapcard in earlier plan; pivoted because the target show is a static HTML list. Swapcard adapter deferred to Phase 3.5 when a real Swapcard URL is in scope.
-4. **Library UI** — new `/library` route reads from DB.
+4. **Library UI** — new `/library` route reads from DB. ✅ pick an event, see Apollo-enriched preview, score with the same `runScoringPipeline` (`lib/scoring-pipeline.ts`) used by CSV mode; matched rows skip PDL via `prefilledEnriched`. Vercel env wiring (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) still pending → out of Phase 4.
 5. **Cron** — Vercel Cron schedules adapters weekly.
 6. **More adapters** (MYS, ExpoFP).
 7. **Phase 2: contacts/people enrichment** — only after Phase 1 has been useful for one show cycle.
