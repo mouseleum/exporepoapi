@@ -16,7 +16,7 @@ Phased, additive, every phase ends in a working app and a commit:
 0. **Migration to Next.js + TS** — port `index.html` and `/api/*.js` to Next.js App Router with TypeScript strict, Tailwind, Vitest, Zod. No behavior change. See `docs/migration-audit.md` for the spec. ✅ shipped
 1. **DB foundation** — Supabase schema (`db/migrations/0001_companies.sql`, project ref `hihhgpzcklusonxnbfcn`), Apollo CSV bulk loader (`scripts/load-apollo.ts`). ✅ 9 986 rows loaded; loader is idempotent on `apollo_account_id`. Service-role key in `.env.local` only — Vercel env wiring deferred to Phase 4. `company-db-agent` stays parallel for lightweight country lookups.
 2. **Refactor scorer to pure** — source-agnostic, used by both CSV and DB modes.
-3. **First adapter (Swapcard)** — port existing GraphQL pattern.
+3. **First adapter** — generic HTML scraper for cyberseceurope.com (`lib/adapters/cyberseceurope.ts`); defines `Adapter` interface (`lib/adapters/types.ts`) for future platform-specific adapters. New tables `events` + `event_exhibitors` (`db/migrations/0002_events.sql`); loader `pnpm load:event <slug>`. ✅ 194 rows loaded for `cyberseceurope-2026`. Originally scoped as Swapcard in earlier plan; pivoted because the target show is a static HTML list. Swapcard adapter deferred to Phase 3.5 when a real Swapcard URL is in scope.
 4. **Library UI** — new `/library` route reads from DB.
 5. **Cron** — Vercel Cron schedules adapters weekly.
 6. **More adapters** (MYS, ExpoFP).
