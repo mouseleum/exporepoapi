@@ -11,11 +11,9 @@ import {
   extractTextFromAnthropic,
 } from "@/lib/api-client";
 import { loadDB, lookupInDB, syncToDB } from "@/lib/company-db";
-import {
-  buildPdfExtractPrompt,
-  buildRankerPrompt,
-} from "@/lib/prompts";
-import { ExtractedCompaniesSchema, RankedArraySchema } from "@/lib/schemas";
+import { buildPdfExtractPrompt } from "@/lib/prompts";
+import { ExtractedCompaniesSchema } from "@/lib/schemas";
+import { scoreCompanies, type ScorableCompany } from "@/lib/scorer";
 import type {
   ColumnSelection,
   CountryWeights as CountryWeightsType,
@@ -374,51 +372,19 @@ export function RankerTab() {
         },
       });
 
-      const topN = state.targetCount;
-      const prompt = buildRankerPrompt(
-        rows,
-        enrichedMap,
-        topN,
-        state.countryWeights,
-      );
-      const maxTok = Math.min(4000, 800 + topN * 30);
-      const data = await apiFetch({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: maxTok,
-        prompt,
-      });
-      const responseText = extractTextFromAnthropic(data);
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error("Unexpected response format.");
-      const ranked = RankedArraySchema.parse(JSON.parse(jsonMatch[0]));
-
-      const nameMap: Record<string, (typeof rows)[number]> = {};
-      for (const r of rows) {
-        nameMap[r.name.toLowerCase().trim()] = r;
-      }
-
-      const final: RankedRow[] = ranked.slice(0, topN).map((item) => {
-        const key = item.name.toLowerCase().trim();
-        const match =
-          nameMap[key] ??
-          rows.find(
-            (r) =>
-              r.name.toLowerCase().includes(key) ||
-              key.includes(r.name.toLowerCase()),
-          );
-        const e = enrichedMap[key];
-        const employees =
-          e && e.matched ? e.employee_count : null;
-        const industry = e && e.matched ? e.industry : null;
+      const scorable: ScorableCompany[] = rows.map((r) => {
+        const e = enrichedMap[r.name.toLowerCase().trim()];
         return {
-          rank: item.rank,
-          name: item.name,
-          country: item.country || (match ? match.country : ""),
-          hall: item.booth || (match ? match.hall : ""),
-          score: item.score,
-          employees,
-          industry,
+          name: r.name,
+          country: r.country,
+          hall: r.hall,
+          employees: e && e.matched ? e.employee_count : null,
+          industry: e && e.matched ? e.industry : null,
         };
+      });
+      const final = await scoreCompanies(scorable, {
+        topN: state.targetCount,
+        countryWeights: state.countryWeights,
       });
 
       dispatch({ type: "SCORE_SUCCESS", data: final });
