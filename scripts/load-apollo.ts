@@ -1,4 +1,6 @@
-import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+loadEnv({ path: ".env.local" });
+loadEnv();
 import { createReadStream } from "node:fs";
 import { parse } from "csv-parse";
 import { createServiceClient } from "../lib/supabase";
