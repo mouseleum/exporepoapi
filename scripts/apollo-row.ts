@@ -86,9 +86,8 @@ function date(raw: Record<string, string>, key: string): string | null {
   return v.slice(0, 10);
 }
 
-export function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
+import { normalizeName } from "../lib/normalize";
+export { normalizeName };
 
 export class MissingApolloIdError extends Error {
   constructor(public readonly rowName: string) {
