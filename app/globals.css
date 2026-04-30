@@ -400,6 +400,102 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
 }
 
+/* Top nav (route-level: Ranker / Library) */
+.top-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.top-nav-link {
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--color-muted2);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+}
+.top-nav-link:hover { color: var(--color-text); }
+.top-nav-link.active {
+  background: var(--color-surface);
+  color: var(--color-accent-blue);
+  border: 1px solid var(--color-border);
+}
+
+/* Library: event picker */
+.event-picker {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  animation: fadeUp 0.4s ease both;
+}
+.event-picker-row { display: flex; align-items: center; gap: 12px; }
+.event-picker-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  min-width: 56px;
+}
+.event-picker-select {
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border2);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+}
+.event-picker-select:focus { border-color: var(--color-accent-blue); }
+.event-picker-meta {
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted2);
+  letter-spacing: 0.04em;
+}
+
+/* Library: exhibitor preview */
+.exhibitor-preview {
+  margin-top: 24px;
+  animation: fadeUp 0.4s ease both;
+}
+.exhibitor-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+.exhibitor-preview-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+.exhibitor-preview-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-accent-blue);
+  letter-spacing: 0.04em;
+}
+.exhibitor-preview-overflow {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;

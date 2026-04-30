@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Header } from "@/components/Header";
+import { TopNav } from "@/components/TopNav";
 import { TabBar, type TabId } from "@/components/TabBar";
 import { RankerTab } from "@/components/ranker/RankerTab";
 import { ListGuideTab } from "@/components/guide/ListGuideTab";
@@ -12,6 +13,7 @@ export default function HomePage() {
   return (
     <div className="wrap">
       <Header />
+      <TopNav />
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div
