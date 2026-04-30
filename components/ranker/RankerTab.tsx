@@ -7,17 +7,15 @@ import { parseSpreadsheet } from "@/lib/xlsx";
 import { chunkText, extractPdfText } from "@/lib/pdf";
 import {
   apiFetch,
-  enrichCompanies,
   extractTextFromAnthropic,
 } from "@/lib/api-client";
-import { loadDB, lookupInDB, syncToDB } from "@/lib/company-db";
+import { syncToDB } from "@/lib/company-db";
 import { buildPdfExtractPrompt } from "@/lib/prompts";
 import { ExtractedCompaniesSchema } from "@/lib/schemas";
-import { scoreCompanies, type ScorableCompany } from "@/lib/scorer";
+import { runScoringPipeline } from "@/lib/scoring-pipeline";
 import type {
   ColumnSelection,
   CountryWeights as CountryWeightsType,
-  EnrichedCompany,
   ParsedRow,
   RankedRow,
   Status,
@@ -313,113 +311,26 @@ export function RankerTab() {
 
     dispatch({ type: "SCORE_START" });
     try {
-      dispatch({
-        type: "STATUS",
-        status: {
-          kind: "loading",
-          message: "Checking company database...",
+      await runScoringPipeline(
+        rows,
+        {
+          topN: state.targetCount,
+          countryWeights: state.countryWeights,
+          source: sourceName(),
         },
-      });
-      const db = await loadDB();
-      for (const r of rows) {
-        if (!r.country) {
-          const hit = lookupInDB(r.name, db);
-          if (hit?.country) r.country = hit.country;
-        }
-      }
-      const dbHits = rows.filter((r) => r.country).length;
-
-      dispatch({
-        type: "STATUS",
-        status: {
-          kind: "loading",
-          message: `DB filled ${dbHits} countries. Enriching with PeopleDataLabs...`,
-        },
-      });
-
-      const enrichedMap: Record<string, EnrichedCompany> = {};
-      const batchSize = 20;
-      for (let i = 0; i < rows.length; i += batchSize) {
-        const batch = rows
-          .slice(i, i + batchSize)
-          .map((r) => ({ name: r.name, country: r.country }));
-        dispatch({
-          type: "STATUS",
-          status: {
-            kind: "loading",
-            message: `Enriching companies... (${Math.min(
-              i + batchSize,
-              rows.length,
-            )}/${rows.length})`,
+        {
+          onStatus: (s) => dispatch({ type: "STATUS", status: s }),
+          onResults: (data) => {
+            dispatch({ type: "SCORE_SUCCESS", data });
+            requestAnimationFrame(() => {
+              resultsRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            });
           },
-        });
-        try {
-          const results = await enrichCompanies(batch);
-          for (const r of results) {
-            if (r.matched) enrichedMap[r.name.toLowerCase().trim()] = r;
-          }
-        } catch {
-          /* continue without enrichment */
-        }
-      }
-
-      const enrichedCount = Object.keys(enrichedMap).length;
-      dispatch({
-        type: "STATUS",
-        status: {
-          kind: "loading",
-          message: `Enriched ${enrichedCount}/${rows.length} companies. Scoring with AI...`,
         },
-      });
-
-      const scorable: ScorableCompany[] = rows.map((r) => {
-        const e = enrichedMap[r.name.toLowerCase().trim()];
-        return {
-          name: r.name,
-          country: r.country,
-          hall: r.hall,
-          employees: e && e.matched ? e.employee_count : null,
-          industry: e && e.matched ? e.industry : null,
-        };
-      });
-      const final = await scoreCompanies(scorable, {
-        topN: state.targetCount,
-        countryWeights: state.countryWeights,
-      });
-
-      dispatch({ type: "SCORE_SUCCESS", data: final });
-      requestAnimationFrame(() => {
-        resultsRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      });
-
-      const syncPayload = rows.map((r) => {
-        const e = enrichedMap[r.name.toLowerCase().trim()];
-        return {
-          name: r.name,
-          country: r.country || null,
-          employees: e && e.matched ? e.employee_count : null,
-          industry: e && e.matched ? e.industry : null,
-        };
-      });
-      try {
-        const result = await syncToDB(syncPayload, sourceName());
-        dispatch({
-          type: "STATUS",
-          status: {
-            kind: "info",
-            message: `✓ Synced to company DB — ${result.added} new, ${result.updated} updated (${result.total} total)`,
-          },
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        dispatch({
-          type: "STATUS",
-          status: { kind: "error", message: "DB sync error: " + message },
-        });
-      }
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       dispatch({
