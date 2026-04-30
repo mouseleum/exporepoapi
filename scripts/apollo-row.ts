@@ -49,10 +49,16 @@ const CUSTOM_HEADER_PREFIXES = [
   "Exhibitor Likelihood",
 ];
 
+const NULL_BYTE = "\u0000";
+function sanitize(v: string): string {
+  // Postgres text columns reject NULL bytes; strip them.
+  return v.includes(NULL_BYTE) ? v.split(NULL_BYTE).join("") : v;
+}
+
 function str(raw: Record<string, string>, key: string): string | null {
   const v = raw[key];
   if (v === undefined) return null;
-  const trimmed = v.trim();
+  const trimmed = sanitize(v).trim();
   return trimmed === "" ? null : trimmed;
 }
 
@@ -67,7 +73,7 @@ function num(raw: Record<string, string>, key: string): number | null {
 function arr(raw: Record<string, string>, key: string): string[] {
   const v = raw[key];
   if (v === undefined) return [];
-  return v
+  return sanitize(v)
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
@@ -107,9 +113,11 @@ export function mapApolloRow(
 
   const apollo_custom: Record<string, string> = {};
   for (const [key, value] of Object.entries(raw)) {
-    if (!value || value.trim() === "") continue;
+    if (!value) continue;
+    const cleaned = sanitize(value).trim();
+    if (cleaned === "") continue;
     if (CUSTOM_HEADER_PREFIXES.some((p) => key.startsWith(p))) {
-      apollo_custom[key] = value.trim();
+      apollo_custom[key] = cleaned;
     }
   }
 

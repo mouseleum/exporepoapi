@@ -193,6 +193,19 @@ describe("mapApolloRow — text field handling", () => {
     expect(out.industry).toBeNull();
   });
 
+  it("strips NULL bytes from text fields (Postgres rejects \\u0000)", () => {
+    const out = mapApolloRow(
+      row({ Industry: "tech\u0000nology", Keywords: "a\u0000b, c" }),
+    );
+    expect(out.industry).toBe("technology");
+    expect(out.keywords).toEqual(["ab", "c"]);
+  });
+
+  it("strips NULL bytes from apollo_custom values", () => {
+    const out = mapApolloRow(row({ "Qualify Account": "yes\u0000" }));
+    expect(out.apollo_custom["Qualify Account"]).toBe("yes");
+  });
+
   it("trims surrounding whitespace from values", () => {
     const out = mapApolloRow(row({ Industry: "  hospital & health care  " }));
     expect(out.industry).toBe("hospital & health care");

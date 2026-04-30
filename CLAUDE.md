@@ -13,8 +13,8 @@ We are doing two things, in order:
 
 Phased, additive, every phase ends in a working app and a commit:
 
-0. **Migration to Next.js + TS** — port `index.html` and `/api/*.js` to Next.js App Router with TypeScript strict, Tailwind, Vitest, Zod. No behavior change. See `docs/migration-audit.md` for the spec.
-1. **DB foundation** — Supabase schema, Apollo CSV bulk loader.
+0. **Migration to Next.js + TS** — port `index.html` and `/api/*.js` to Next.js App Router with TypeScript strict, Tailwind, Vitest, Zod. No behavior change. See `docs/migration-audit.md` for the spec. ✅ shipped
+1. **DB foundation** — Supabase schema (`db/migrations/0001_companies.sql`, project ref `hihhgpzcklusonxnbfcn`), Apollo CSV bulk loader (`scripts/load-apollo.ts`). ✅ 9 986 rows loaded; loader is idempotent on `apollo_account_id`. Service-role key in `.env.local` only — Vercel env wiring deferred to Phase 4. `company-db-agent` stays parallel for lightweight country lookups.
 2. **Refactor scorer to pure** — source-agnostic, used by both CSV and DB modes.
 3. **First adapter (Swapcard)** — port existing GraphQL pattern.
 4. **Library UI** — new `/library` route reads from DB.
