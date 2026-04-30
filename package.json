@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "load:apollo": "tsx scripts/load-apollo.ts"
+    "load:apollo": "tsx scripts/load-apollo.ts",
+    "load:event": "tsx scripts/load-event.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
