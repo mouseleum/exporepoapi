@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/", label: "Ranker" },
   { href: "/library", label: "Library" },
+  { href: "/library/compare", label: "Compare" },
 ];
 
 export function TopNav() {
@@ -13,8 +14,7 @@ export function TopNav() {
   return (
     <nav className="top-nav">
       {links.map((l) => {
-        const active =
-          l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+        const active = pathname === l.href;
         return (
           <Link
             key={l.href}
