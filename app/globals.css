@@ -464,6 +464,41 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   letter-spacing: 0.04em;
 }
 
+/* Library: tag picker + pill colors */
+.tag-picker {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border2);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  letter-spacing: 0.04em;
+}
+.tag-picker:focus { border-color: var(--color-accent-blue); }
+.tag-picker.tag-customer { color: var(--color-success); border-color: var(--color-success); }
+.tag-picker.tag-prospect { color: var(--color-accent-blue); border-color: var(--color-accent-blue); }
+.tag-picker.tag-won { color: var(--color-accent); border-color: var(--color-accent); }
+.tag-picker.tag-lost { color: var(--color-muted); border-color: var(--color-border2); }
+
+.tag-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid;
+}
+.tag-pill.tag-customer { color: var(--color-success); border-color: var(--color-success); }
+.tag-pill.tag-prospect { color: var(--color-accent-blue); border-color: var(--color-accent-blue); }
+.tag-pill.tag-won { color: var(--color-accent); border-color: var(--color-accent); }
+.tag-pill.tag-lost { color: var(--color-muted); border-color: var(--color-border2); }
+
 /* Library compare: event count + list */
 .event-count-badge {
   display: inline-block;

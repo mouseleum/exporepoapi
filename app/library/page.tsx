@@ -12,6 +12,7 @@ import { ExhibitorPreview } from "@/components/library/ExhibitorPreview";
 import {
   listEvents,
   getEventExhibitors,
+  setCompanyTag,
 } from "@/app/library/actions";
 import { runScoringPipeline } from "@/lib/scoring-pipeline";
 import {
@@ -22,6 +23,7 @@ import {
 import type {
   EventListItem,
   LibraryExhibitor,
+  TagValue,
 } from "@/lib/library/queries";
 import type {
   CountryWeights as CountryWeightsType,
@@ -54,6 +56,7 @@ type Action =
       targetCount: number;
       scoredAt: string;
     }
+  | { type: "TAG_UPDATED"; name_normalized: string; tag: TagValue | null }
   | { type: "WEIGHTS_CHANGED"; weights: CountryWeightsType }
   | { type: "TARGET_CHANGED"; n: number }
   | { type: "STATUS"; status: Status }
@@ -99,6 +102,15 @@ function reducer(state: State, action: Action): State {
         countryWeights: action.weights,
         targetCount: action.targetCount,
         cachedScoredAt: action.scoredAt,
+      };
+    case "TAG_UPDATED":
+      return {
+        ...state,
+        exhibitors: state.exhibitors.map((e) =>
+          e.name_normalized === action.name_normalized
+            ? { ...e, tag: action.tag }
+            : e,
+        ),
       };
     case "WEIGHTS_CHANGED":
       return { ...state, countryWeights: action.weights };
@@ -203,6 +215,26 @@ export default function LibraryPage() {
   );
 
   const selectedEvent = state.events.find((e) => e.id === state.selectedId);
+
+  const handleTagChange = async (
+    name_normalized: string,
+    tag: TagValue | null,
+  ) => {
+    const prev =
+      state.exhibitors.find((e) => e.name_normalized === name_normalized)?.tag ??
+      null;
+    dispatch({ type: "TAG_UPDATED", name_normalized, tag });
+    try {
+      await setCompanyTag(name_normalized, tag);
+    } catch (err) {
+      dispatch({ type: "TAG_UPDATED", name_normalized, tag: prev });
+      const message = err instanceof Error ? err.message : String(err);
+      dispatch({
+        type: "STATUS",
+        status: { kind: "error", message: "Tag save failed: " + message },
+      });
+    }
+  };
 
   const runScoring = async () => {
     if (!state.exhibitors.length) return;
@@ -350,7 +382,10 @@ export default function LibraryPage() {
       )}
 
       {state.exhibitors.length > 0 && (
-        <ExhibitorPreview exhibitors={state.exhibitors} />
+        <ExhibitorPreview
+          exhibitors={state.exhibitors}
+          onTagChange={handleTagChange}
+        />
       )}
 
       <StatusBox status={state.status} />

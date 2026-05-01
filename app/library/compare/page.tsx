@@ -102,6 +102,7 @@ export default function ComparePage() {
                   <th>Country</th>
                   <th>Employees</th>
                   <th>Industry</th>
+                  <th>Tag</th>
                   <th>Events</th>
                 </tr>
               </thead>
@@ -114,6 +115,13 @@ export default function ComparePage() {
                       {formatEmployees(r.employees)}
                     </td>
                     <td className="industry-cell">{r.industry ?? "—"}</td>
+                    <td className="hall-cell">
+                      {r.tag ? (
+                        <span className={`tag-pill tag-${r.tag}`}>{r.tag}</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="hall-cell">
                       <span className="event-count-badge">
                         {r.events.length}
