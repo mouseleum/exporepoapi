@@ -14,6 +14,11 @@ import {
   getEventExhibitors,
 } from "@/app/library/actions";
 import { runScoringPipeline } from "@/lib/scoring-pipeline";
+import {
+  loadScoringCache,
+  saveScoringCache,
+  clearScoringCache,
+} from "@/lib/library/scoring-cache";
 import type {
   EventListItem,
   LibraryExhibitor,
@@ -33,6 +38,7 @@ type State = {
   countryWeights: CountryWeightsType;
   targetCount: number;
   rankedData: RankedRow[];
+  cachedScoredAt: string | null;
   isScoring: boolean;
   status: Status;
 };
@@ -41,6 +47,13 @@ type Action =
   | { type: "EVENTS_LOADED"; events: EventListItem[] }
   | { type: "EVENT_SELECTED"; id: string }
   | { type: "EXHIBITORS_LOADED"; exhibitors: LibraryExhibitor[] }
+  | {
+      type: "CACHE_HYDRATED";
+      ranked: RankedRow[];
+      weights: CountryWeightsType;
+      targetCount: number;
+      scoredAt: string;
+    }
   | { type: "WEIGHTS_CHANGED"; weights: CountryWeightsType }
   | { type: "TARGET_CHANGED"; n: number }
   | { type: "STATUS"; status: Status }
@@ -55,6 +68,7 @@ const initialState: State = {
   countryWeights: {},
   targetCount: 50,
   rankedData: [],
+  cachedScoredAt: null,
   isScoring: false,
   status: { kind: "idle" },
 };
@@ -70,12 +84,21 @@ function reducer(state: State, action: Action): State {
         exhibitors: [],
         countryWeights: {},
         rankedData: [],
+        cachedScoredAt: null,
       };
     case "EXHIBITORS_LOADED":
       return {
         ...state,
         exhibitors: action.exhibitors,
         status: { kind: "idle" },
+      };
+    case "CACHE_HYDRATED":
+      return {
+        ...state,
+        rankedData: action.ranked,
+        countryWeights: action.weights,
+        targetCount: action.targetCount,
+        cachedScoredAt: action.scoredAt,
       };
     case "WEIGHTS_CHANGED":
       return { ...state, countryWeights: action.weights };
@@ -84,7 +107,12 @@ function reducer(state: State, action: Action): State {
     case "STATUS":
       return { ...state, status: action.status };
     case "SCORE_START":
-      return { ...state, isScoring: true, rankedData: [] };
+      return {
+        ...state,
+        isScoring: true,
+        rankedData: [],
+        cachedScoredAt: null,
+      };
     case "SCORE_SUCCESS":
       return {
         ...state,
@@ -142,6 +170,16 @@ export default function LibraryPage() {
       .then((exhibitors) => {
         if (cancelled) return;
         dispatch({ type: "EXHIBITORS_LOADED", exhibitors });
+        const cached = loadScoringCache(id);
+        if (cached) {
+          dispatch({
+            type: "CACHE_HYDRATED",
+            ranked: cached.ranked,
+            weights: cached.weights,
+            targetCount: cached.targetCount,
+            scoredAt: cached.scoredAt,
+          });
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -208,6 +246,12 @@ export default function LibraryPage() {
           onStatus: (s) => dispatch({ type: "STATUS", status: s }),
           onResults: (data) => {
             dispatch({ type: "SCORE_SUCCESS", data });
+            saveScoringCache(event.id, {
+              ranked: data,
+              weights: state.countryWeights,
+              targetCount: state.targetCount,
+              scoredAt: new Date().toISOString(),
+            });
             requestAnimationFrame(() => {
               resultsRef.current?.scrollIntoView({
                 behavior: "smooth",
@@ -313,6 +357,26 @@ export default function LibraryPage() {
 
       {state.rankedData.length > 0 && (
         <div ref={resultsRef}>
+          {state.cachedScoredAt && (
+            <div className="cache-banner">
+              <span>
+                Showing scored results from{" "}
+                {new Date(state.cachedScoredAt).toLocaleString()} (cached
+                locally).
+              </span>
+              <button
+                type="button"
+                className="cache-banner-btn"
+                disabled={state.isScoring}
+                onClick={() => {
+                  if (state.selectedId) clearScoringCache(state.selectedId);
+                  void runScoring();
+                }}
+              >
+                Re-score
+              </button>
+            </div>
+          )}
           <ResultsTable data={state.rankedData} onDownload={downloadCSV} />
         </div>
       )}
