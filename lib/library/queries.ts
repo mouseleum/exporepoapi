@@ -10,14 +10,19 @@ export type EventListItem = {
   exhibitor_count: number;
 };
 
+export const TAG_VALUES = ["customer", "prospect", "won", "lost"] as const;
+export type TagValue = (typeof TAG_VALUES)[number];
+
 export type LibraryExhibitor = {
   raw_name: string;
+  name_normalized: string;
   country: string;
   hall: string;
   booth: string | null;
   employees: number | null;
   industry: string | null;
   apollo_matched: boolean;
+  tag: TagValue | null;
 };
 
 export type CrossEventCompany = {
@@ -28,7 +33,10 @@ export type CrossEventCompany = {
   employees: number | null;
   industry: string | null;
   apollo_matched: boolean;
+  tag: TagValue | null;
 };
+
+type TagRow = { name_normalized: string; tag: TagValue };
 
 type EeWithEvent = EeRow & { event_id: string };
 
@@ -54,22 +62,32 @@ type ApolloRow = {
   industry: string | null;
 };
 
+export function tagsByName(tags: TagRow[]): Map<string, TagValue> {
+  const m = new Map<string, TagValue>();
+  for (const t of tags) m.set(t.name_normalized, t.tag);
+  return m;
+}
+
 export function joinEventExhibitors(
   ees: EeRow[],
   apollos: ApolloRow[],
+  tags: TagRow[] = [],
 ): LibraryExhibitor[] {
   const byName = new Map<string, ApolloRow>();
   for (const a of apollos) byName.set(a.name_normalized, a);
+  const tagMap = tagsByName(tags);
   return ees.map((ee) => {
     const apollo = byName.get(ee.name_normalized);
     return {
       raw_name: ee.raw_name,
+      name_normalized: ee.name_normalized,
       country: ee.country || apollo?.country || "",
       hall: ee.hall ?? "",
       booth: ee.booth,
       employees: apollo?.employees ?? null,
       industry: apollo?.industry ?? null,
       apollo_matched: !!apollo,
+      tag: tagMap.get(ee.name_normalized) ?? null,
     };
   });
 }
@@ -78,12 +96,15 @@ export function groupCrossEventCompanies(
   ees: EeWithEvent[],
   events: EventRef[],
   apollos: ApolloRow[],
+  tags: TagRow[] = [],
 ): CrossEventCompany[] {
   const eventMap = new Map<string, EventRef>();
   for (const e of events) eventMap.set(e.id, e);
 
   const apolloMap = new Map<string, ApolloRow>();
   for (const a of apollos) apolloMap.set(a.name_normalized, a);
+
+  const tagMap = tagsByName(tags);
 
   type Bucket = {
     display_name: string;
@@ -130,6 +151,7 @@ export function groupCrossEventCompanies(
       employees: apollo?.employees ?? null,
       industry: apollo?.industry ?? null,
       apollo_matched: !!apollo,
+      tag: tagMap.get(name_normalized) ?? null,
     });
   }
 
@@ -158,17 +180,26 @@ export async function getCrossEventExhibitors(
   const normalized = Array.from(
     new Set(ees.map((r) => r.name_normalized as string)),
   );
-  const { data: apollos, error: aErr } = await supabase
-    .from("companies")
-    .select("name_normalized, country, employees, industry")
-    .in("name_normalized", normalized);
-  if (aErr)
-    throw new Error(`getCrossEventExhibitors apollo: ${aErr.message}`);
+  const [apolloRes, tagsRes] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("name_normalized, country, employees, industry")
+      .in("name_normalized", normalized),
+    supabase
+      .from("company_tags")
+      .select("name_normalized, tag")
+      .in("name_normalized", normalized),
+  ]);
+  if (apolloRes.error)
+    throw new Error(`getCrossEventExhibitors apollo: ${apolloRes.error.message}`);
+  if (tagsRes.error)
+    throw new Error(`getCrossEventExhibitors tags: ${tagsRes.error.message}`);
 
   return groupCrossEventCompanies(
     ees as EeWithEvent[],
     (events as EventRef[] | null) ?? [],
-    (apollos as ApolloRow[] | null) ?? [],
+    (apolloRes.data as ApolloRow[] | null) ?? [],
+    (tagsRes.data as TagRow[] | null) ?? [],
   );
 }
 
@@ -217,14 +248,46 @@ export async function getEventExhibitors(
   if (!ees || ees.length === 0) return [];
 
   const normalized = ees.map((r) => r.name_normalized as string);
-  const { data: apollos, error: aErr } = await supabase
-    .from("companies")
-    .select("name_normalized, country, employees, industry")
-    .in("name_normalized", normalized);
-  if (aErr) throw new Error(`getEventExhibitors apollo: ${aErr.message}`);
+  const [apolloRes, tagsRes] = await Promise.all([
+    supabase
+      .from("companies")
+      .select("name_normalized, country, employees, industry")
+      .in("name_normalized", normalized),
+    supabase
+      .from("company_tags")
+      .select("name_normalized, tag")
+      .in("name_normalized", normalized),
+  ]);
+  if (apolloRes.error)
+    throw new Error(`getEventExhibitors apollo: ${apolloRes.error.message}`);
+  if (tagsRes.error)
+    throw new Error(`getEventExhibitors tags: ${tagsRes.error.message}`);
 
   return joinEventExhibitors(
     ees as EeRow[],
-    (apollos as ApolloRow[] | null) ?? [],
+    (apolloRes.data as ApolloRow[] | null) ?? [],
+    (tagsRes.data as TagRow[] | null) ?? [],
   );
+}
+
+export async function setCompanyTag(
+  name_normalized: string,
+  tag: TagValue | null,
+  supabase: SupabaseClient = createServiceClient(),
+): Promise<void> {
+  if (tag === null) {
+    const { error } = await supabase
+      .from("company_tags")
+      .delete()
+      .eq("name_normalized", name_normalized);
+    if (error) throw new Error(`setCompanyTag delete: ${error.message}`);
+    return;
+  }
+  const { error } = await supabase
+    .from("company_tags")
+    .upsert(
+      { name_normalized, tag, updated_at: new Date().toISOString() },
+      { onConflict: "name_normalized" },
+    );
+  if (error) throw new Error(`setCompanyTag upsert: ${error.message}`);
 }

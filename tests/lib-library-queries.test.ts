@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   groupCrossEventCompanies,
   joinEventExhibitors,
+  tagsByName,
 } from "../lib/library/queries";
 
 describe("joinEventExhibitors", () => {
@@ -25,12 +26,14 @@ describe("joinEventExhibitors", () => {
     expect(result).toEqual([
       {
         raw_name: "Acen NV",
+        name_normalized: "acennv",
         country: "",
         hall: "",
         booth: null,
         employees: null,
         industry: null,
         apollo_matched: false,
+        tag: null,
       },
     ]);
   });
@@ -317,5 +320,77 @@ describe("groupCrossEventCompanies", () => {
       "Bravo",
       "Charlie",
     ]);
+  });
+});
+
+describe("tagsByName", () => {
+  it("returns empty map for empty input", () => {
+    expect(tagsByName([]).size).toBe(0);
+  });
+
+  it("indexes tags by name_normalized", () => {
+    const m = tagsByName([
+      { name_normalized: "acme", tag: "customer" },
+      { name_normalized: "signify", tag: "prospect" },
+    ]);
+    expect(m.get("acme")).toBe("customer");
+    expect(m.get("signify")).toBe("prospect");
+    expect(m.get("missing")).toBeUndefined();
+  });
+});
+
+describe("joinEventExhibitors with tags", () => {
+  it("populates tag from company_tags when present", () => {
+    const result = joinEventExhibitors(
+      [
+        {
+          raw_name: "Acme",
+          country: null,
+          hall: null,
+          booth: null,
+          name_normalized: "acme",
+        },
+      ],
+      [],
+      [{ name_normalized: "acme", tag: "customer" }],
+    );
+    expect(result[0]?.tag).toBe("customer");
+  });
+
+  it("tag is null when no matching company_tags row", () => {
+    const result = joinEventExhibitors(
+      [
+        {
+          raw_name: "Acme",
+          country: null,
+          hall: null,
+          booth: null,
+          name_normalized: "acme",
+        },
+      ],
+      [],
+      [{ name_normalized: "other", tag: "won" }],
+    );
+    expect(result[0]?.tag).toBeNull();
+  });
+});
+
+describe("groupCrossEventCompanies with tags", () => {
+  const events = [
+    { id: "e1", slug: "show-a", name: "Show A", year: 2025 },
+    { id: "e2", slug: "show-b", name: "Show B", year: 2026 },
+  ];
+
+  it("populates tag on cross-event rows when present", () => {
+    const result = groupCrossEventCompanies(
+      [
+        { raw_name: "Acme", country: null, hall: null, booth: null, name_normalized: "acme", event_id: "e1" },
+        { raw_name: "Acme", country: null, hall: null, booth: null, name_normalized: "acme", event_id: "e2" },
+      ],
+      events,
+      [],
+      [{ name_normalized: "acme", tag: "won" }],
+    );
+    expect(result[0]?.tag).toBe("won");
   });
 });
