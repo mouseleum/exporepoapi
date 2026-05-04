@@ -6,6 +6,8 @@ import {
   getCrossEventExhibitors as _getCrossEventExhibitors,
   setCompanyTag as _setCompanyTag,
   saveEventWithExhibitors as _saveEventWithExhibitors,
+  bulkSetCompanyTags as _bulkSetCompanyTags,
+  listTaggedCompanies as _listTaggedCompanies,
   type EventListItem,
   type LibraryExhibitor,
   type CrossEventCompany,
@@ -13,6 +15,8 @@ import {
   type SaveEventInput,
   type SaveEventRow,
   type SaveEventResult,
+  type BulkTagResult,
+  type TaggedCompanyRow,
 } from "@/lib/library/queries";
 
 export async function listEvents(): Promise<EventListItem[]> {
@@ -41,4 +45,15 @@ export async function saveEventFromCsv(
   rows: SaveEventRow[],
 ): Promise<SaveEventResult> {
   return _saveEventWithExhibitors(meta, rows);
+}
+
+export async function bulkSetCompanyTags(
+  names: string[],
+  tag: TagValue,
+): Promise<BulkTagResult> {
+  return _bulkSetCompanyTags(names, tag);
+}
+
+export async function listTaggedCompanies(): Promise<TaggedCompanyRow[]> {
+  return _listTaggedCompanies();
 }

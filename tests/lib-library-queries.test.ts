@@ -3,6 +3,7 @@ import {
   dedupeForSave,
   groupCrossEventCompanies,
   joinEventExhibitors,
+  parseTagInput,
   tagsByName,
 } from "../lib/library/queries";
 
@@ -435,5 +436,25 @@ describe("dedupeForSave", () => {
       booth: "A1",
       name_normalized: "acme",
     });
+  });
+});
+
+describe("parseTagInput", () => {
+  it("splits on newlines and commas, trims, and dedupes (case-insensitive)", () => {
+    const out = parseTagInput("Acme Corp\nAcme Corp\nbeta ltd, Beta Ltd!\n  \n");
+    expect(out).toEqual(["Acme Corp", "beta ltd"]);
+  });
+
+  it("ignores entries shorter than 2 chars", () => {
+    expect(parseTagInput("a\nbb\nccc")).toEqual(["bb", "ccc"]);
+  });
+
+  it("ignores entries that normalize to empty (pure punctuation)", () => {
+    expect(parseTagInput("---\n!!!\nReal Co")).toEqual(["Real Co"]);
+  });
+
+  it("returns [] for empty input", () => {
+    expect(parseTagInput("")).toEqual([]);
+    expect(parseTagInput("   \n\t\n")).toEqual([]);
   });
 });

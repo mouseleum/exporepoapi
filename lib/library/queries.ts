@@ -414,6 +414,119 @@ export async function saveEventWithExhibitors(
   };
 }
 
+export type TaggedCompanyRow = {
+  name_normalized: string;
+  display_name: string;
+  country: string | null;
+  employees: number | null;
+  industry: string | null;
+  tag: TagValue;
+  updated_at: string;
+};
+
+export function parseTagInput(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of text.split(/\r?\n|,/)) {
+    const t = raw.trim();
+    if (t.length < 2) continue;
+    const norm = normalizeName(t);
+    if (!norm) continue;
+    if (seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(t);
+  }
+  return out;
+}
+
+export type BulkTagResult = {
+  applied: number;
+  matched_in_apollo: number;
+};
+
+export async function bulkSetCompanyTags(
+  names: string[],
+  tag: TagValue,
+  supabase: SupabaseClient = createServiceClient(),
+): Promise<BulkTagResult> {
+  const seen = new Set<string>();
+  const rows: { name_normalized: string; tag: TagValue; updated_at: string }[] =
+    [];
+  const now = new Date().toISOString();
+  for (const raw of names) {
+    const norm = normalizeName(raw);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    rows.push({ name_normalized: norm, tag, updated_at: now });
+  }
+  if (rows.length === 0) return { applied: 0, matched_in_apollo: 0 };
+
+  for (let i = 0; i < rows.length; i += SAVE_BATCH_SIZE) {
+    const batch = rows.slice(i, i + SAVE_BATCH_SIZE);
+    const { error } = await supabase
+      .from("company_tags")
+      .upsert(batch, { onConflict: "name_normalized" });
+    if (error) throw new Error(`bulkSetCompanyTags: ${error.message}`);
+  }
+
+  const matched = await chunkedInLookup<{ name_normalized: string }>(
+    rows.map((r) => r.name_normalized),
+    (chunk) =>
+      supabase
+        .from("companies")
+        .select("name_normalized")
+        .in("name_normalized", chunk),
+    "bulkSetCompanyTags apollo lookup",
+  );
+  return { applied: rows.length, matched_in_apollo: matched.length };
+}
+
+export async function listTaggedCompanies(
+  supabase: SupabaseClient = createServiceClient(),
+): Promise<TaggedCompanyRow[]> {
+  const tags: Array<TagRow & { updated_at: string }> = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("company_tags")
+      .select("name_normalized, tag, updated_at")
+      .order("updated_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`listTaggedCompanies tags: ${error.message}`);
+    if (!data || data.length === 0) break;
+    tags.push(...(data as Array<TagRow & { updated_at: string }>));
+    if (data.length < PAGE_SIZE) break;
+  }
+  if (tags.length === 0) return [];
+
+  const normalized = tags.map((t) => t.name_normalized);
+  const apollos = await chunkedInLookup<
+    ApolloRow & { name: string | null }
+  >(
+    normalized,
+    (chunk) =>
+      supabase
+        .from("companies")
+        .select("name_normalized, name, country, employees, industry")
+        .in("name_normalized", chunk),
+    "listTaggedCompanies apollo",
+  );
+  const apolloMap = new Map<string, ApolloRow & { name: string | null }>();
+  for (const a of apollos) apolloMap.set(a.name_normalized, a);
+
+  return tags.map((t) => {
+    const apollo = apolloMap.get(t.name_normalized);
+    return {
+      name_normalized: t.name_normalized,
+      display_name: apollo?.name ?? t.name_normalized,
+      country: apollo?.country ?? null,
+      employees: apollo?.employees ?? null,
+      industry: apollo?.industry ?? null,
+      tag: t.tag,
+      updated_at: t.updated_at,
+    };
+  });
+}
+
 export async function setCompanyTag(
   name_normalized: string,
   tag: TagValue | null,

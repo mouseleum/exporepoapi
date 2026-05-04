@@ -7,6 +7,7 @@ const links = [
   { href: "/", label: "Ranker" },
   { href: "/library", label: "Library" },
   { href: "/library/compare", label: "Compare" },
+  { href: "/library/tags", label: "Tags" },
 ];
 
 export function TopNav() {

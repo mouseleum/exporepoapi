@@ -617,6 +617,94 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
 }
 .save-library-year { flex: 0 0 100px; }
 
+.bulk-tag {
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  animation: fadeUp 0.4s ease both;
+}
+.bulk-tag-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted2);
+  margin-bottom: 10px;
+}
+.bulk-tag-textarea {
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--color-border2);
+  border-radius: 4px;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+  resize: vertical;
+}
+.bulk-tag-textarea:focus {
+  outline: none;
+  border-color: var(--color-accent-blue);
+}
+.bulk-tag-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.bulk-tag-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bulk-tag-tag span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.bulk-tag-count {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+}
+.bulk-tag-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.bulk-tag-filter {
+  background: transparent;
+  border: 1px solid var(--color-border2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.bulk-tag-filter:hover { border-color: var(--color-accent-blue); }
+.bulk-tag-filter.active {
+  color: var(--color-text);
+  border-color: var(--color-accent-blue);
+}
+.bulk-tag-filter-count {
+  margin-left: 4px;
+  color: var(--color-muted2);
+}
+.bulk-tag-filter-customer.active { border-color: var(--color-success); color: var(--color-success); }
+.bulk-tag-filter-prospect.active { border-color: var(--color-accent-blue); color: var(--color-accent-blue); }
+.bulk-tag-filter-won.active { border-color: var(--color-accent); color: var(--color-accent); }
+.bulk-tag-filter-lost.active { border-color: var(--color-border2); color: var(--color-muted); }
+
 /* Library: exhibitor preview */
 .exhibitor-preview {
   margin-top: 24px;
