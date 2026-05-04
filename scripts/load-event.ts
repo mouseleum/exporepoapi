@@ -57,14 +57,35 @@ async function main(): Promise<void> {
   }
   const eventId = eventInsert.id as string;
 
-  const rows = exhibitors.map((x) => ({
-    event_id: eventId,
-    raw_name: x.raw_name,
-    name_normalized: normalizeName(x.raw_name),
-    country: x.country ?? null,
-    hall: x.hall ?? null,
-    booth: x.booth ?? null,
-  }));
+  const seen = new Set<string>();
+  const rows: Array<{
+    event_id: string;
+    raw_name: string;
+    name_normalized: string;
+    country: string | null;
+    hall: string | null;
+    booth: string | null;
+  }> = [];
+  let dupes = 0;
+  for (const x of exhibitors) {
+    const name_normalized = normalizeName(x.raw_name);
+    if (seen.has(name_normalized)) {
+      dupes++;
+      continue;
+    }
+    seen.add(name_normalized);
+    rows.push({
+      event_id: eventId,
+      raw_name: x.raw_name,
+      name_normalized,
+      country: x.country ?? null,
+      hall: x.hall ?? null,
+      booth: x.booth ?? null,
+    });
+  }
+  if (dupes > 0) {
+    console.log(`Skipped ${dupes} duplicate name_normalized rows.`);
+  }
 
   let upserted = 0;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
