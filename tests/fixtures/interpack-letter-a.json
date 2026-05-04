@@ -1,0 +1,56 @@
+[
+  {
+    "id": "profile=interpack2026.3024913",
+    "type": "profile",
+    "exh": "interpack2026.3024913",
+    "name": "A&D Verpackungsmaschinenbau GmbH",
+    "country": "Germany",
+    "city": "Weissensberg",
+    "location": "Hall 15 / D42",
+    "tags": [],
+    "premium": false
+  },
+  {
+    "id": "profile=interpack2026.3006956",
+    "type": "profile",
+    "exh": "interpack2026.3006956",
+    "name": "A-Z Color sp. z o. o. sp. k.",
+    "country": "Poland",
+    "city": "Ostrołeka",
+    "location": "Hall 8a / C12",
+    "tags": [],
+    "premium": false
+  },
+  {
+    "id": "profile=interpack2026.3037814",
+    "type": "profile",
+    "exh": "interpack2026.3037814",
+    "name": "AK Industries SL",
+    "country": "Spain",
+    "city": "Vilasar de Dalt",
+    "location": "Hall 4 / C62",
+    "tags": [],
+    "premium": true
+  },
+  {
+    "id": "trademark=interpack2026.3037814.5498934",
+    "type": "trademark",
+    "exh": "interpack2026.3037814",
+    "name": "AK RAMON",
+    "country": "",
+    "city": "Vilasar de Dalt",
+    "location": "Hall 4 / C62",
+    "premium": false
+  },
+  {
+    "id": "profile=interpack2026.9999999",
+    "type": "profile",
+    "exh": "interpack2026.9999999",
+    "name": "No Booth Yet GmbH",
+    "country": "Germany",
+    "city": "Berlin",
+    "location": "",
+    "tags": [],
+    "premium": false
+  }
+]

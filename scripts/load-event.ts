@@ -5,9 +5,11 @@ import { createServiceClient } from "../lib/supabase";
 import { normalizeName } from "../lib/normalize";
 import type { Adapter } from "../lib/adapters/types";
 import { cyberseceuropeAdapter } from "../lib/adapters/cyberseceurope";
+import { interpackAdapter } from "../lib/adapters/interpack";
 
 const ADAPTERS: Record<string, Adapter> = {
   cyberseceurope: cyberseceuropeAdapter,
+  interpack: interpackAdapter,
 };
 
 const BATCH_SIZE = 500;

@@ -1,0 +1,8 @@
+{
+  "links": [
+    { "link": "a", "label": "A", "isFilled": true },
+    { "link": "b", "label": "B", "isFilled": true },
+    { "link": "q", "label": "Q", "isFilled": false },
+    { "link": "other", "label": "0-9", "isFilled": true }
+  ]
+}
