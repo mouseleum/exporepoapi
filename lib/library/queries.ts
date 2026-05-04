@@ -63,6 +63,27 @@ type ApolloRow = {
   industry: string | null;
 };
 
+const IN_CHUNK = 500;
+
+async function chunkedInLookup<T>(
+  keys: string[],
+  fetchChunk: (chunk: string[]) => PromiseLike<{
+    data: T[] | null;
+    error: { message: string } | null;
+  }>,
+  label: string,
+): Promise<T[]> {
+  if (keys.length === 0) return [];
+  const out: T[] = [];
+  for (let i = 0; i < keys.length; i += IN_CHUNK) {
+    const chunk = keys.slice(i, i + IN_CHUNK);
+    const { data, error } = await fetchChunk(chunk);
+    if (error) throw new Error(`${label}: ${error.message}`);
+    if (data) out.push(...data);
+  }
+  return out;
+}
+
 export function tagsByName(tags: TagRow[]): Map<string, TagValue> {
   const m = new Map<string, TagValue>();
   for (const t of tags) m.set(t.name_normalized, t.tag);
@@ -181,26 +202,32 @@ export async function getCrossEventExhibitors(
   const normalized = Array.from(
     new Set(ees.map((r) => r.name_normalized as string)),
   );
-  const [apolloRes, tagsRes] = await Promise.all([
-    supabase
-      .from("companies")
-      .select("name_normalized, country, employees, industry")
-      .in("name_normalized", normalized),
-    supabase
-      .from("company_tags")
-      .select("name_normalized, tag")
-      .in("name_normalized", normalized),
+  const [apollos, tags] = await Promise.all([
+    chunkedInLookup<ApolloRow>(
+      normalized,
+      (chunk) =>
+        supabase
+          .from("companies")
+          .select("name_normalized, country, employees, industry")
+          .in("name_normalized", chunk),
+      "getCrossEventExhibitors apollo",
+    ),
+    chunkedInLookup<TagRow>(
+      normalized,
+      (chunk) =>
+        supabase
+          .from("company_tags")
+          .select("name_normalized, tag")
+          .in("name_normalized", chunk),
+      "getCrossEventExhibitors tags",
+    ),
   ]);
-  if (apolloRes.error)
-    throw new Error(`getCrossEventExhibitors apollo: ${apolloRes.error.message}`);
-  if (tagsRes.error)
-    throw new Error(`getCrossEventExhibitors tags: ${tagsRes.error.message}`);
 
   return groupCrossEventCompanies(
     ees as EeWithEvent[],
     (events as EventRef[] | null) ?? [],
-    (apolloRes.data as ApolloRow[] | null) ?? [],
-    (tagsRes.data as TagRow[] | null) ?? [],
+    apollos,
+    tags,
   );
 }
 
@@ -249,26 +276,28 @@ export async function getEventExhibitors(
   if (!ees || ees.length === 0) return [];
 
   const normalized = ees.map((r) => r.name_normalized as string);
-  const [apolloRes, tagsRes] = await Promise.all([
-    supabase
-      .from("companies")
-      .select("name_normalized, country, employees, industry")
-      .in("name_normalized", normalized),
-    supabase
-      .from("company_tags")
-      .select("name_normalized, tag")
-      .in("name_normalized", normalized),
+  const [apollos, tags] = await Promise.all([
+    chunkedInLookup<ApolloRow>(
+      normalized,
+      (chunk) =>
+        supabase
+          .from("companies")
+          .select("name_normalized, country, employees, industry")
+          .in("name_normalized", chunk),
+      "getEventExhibitors apollo",
+    ),
+    chunkedInLookup<TagRow>(
+      normalized,
+      (chunk) =>
+        supabase
+          .from("company_tags")
+          .select("name_normalized, tag")
+          .in("name_normalized", chunk),
+      "getEventExhibitors tags",
+    ),
   ]);
-  if (apolloRes.error)
-    throw new Error(`getEventExhibitors apollo: ${apolloRes.error.message}`);
-  if (tagsRes.error)
-    throw new Error(`getEventExhibitors tags: ${tagsRes.error.message}`);
 
-  return joinEventExhibitors(
-    ees as EeRow[],
-    (apolloRes.data as ApolloRow[] | null) ?? [],
-    (tagsRes.data as TagRow[] | null) ?? [],
-  );
+  return joinEventExhibitors(ees as EeRow[], apollos, tags);
 }
 
 export type SaveEventInput = {
