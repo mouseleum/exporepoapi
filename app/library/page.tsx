@@ -9,6 +9,7 @@ import { TargetCountSlider } from "@/components/ranker/TargetCountSlider";
 import { ResultsTable } from "@/components/ranker/ResultsTable";
 import { EventPicker } from "@/components/library/EventPicker";
 import { ExhibitorPreview } from "@/components/library/ExhibitorPreview";
+import { FilterBar } from "@/components/library/FilterBar";
 import {
   listEvents,
   getEventExhibitors,
@@ -20,6 +21,11 @@ import {
   saveScoringCache,
   clearScoringCache,
 } from "@/lib/library/scoring-cache";
+import {
+  applyFilter,
+  type FilterState,
+  type FilterTag,
+} from "@/lib/library/filters";
 import type {
   EventListItem,
   LibraryExhibitor,
@@ -37,6 +43,7 @@ type State = {
   events: EventListItem[];
   selectedId: string | null;
   exhibitors: LibraryExhibitor[];
+  filter: FilterState;
   countryWeights: CountryWeightsType;
   targetCount: number;
   rankedData: RankedRow[];
@@ -57,6 +64,7 @@ type Action =
       scoredAt: string;
     }
   | { type: "TAG_UPDATED"; name_normalized: string; tag: TagValue | null }
+  | { type: "FILTER_CHANGED"; filter: FilterState }
   | { type: "WEIGHTS_CHANGED"; weights: CountryWeightsType }
   | { type: "TARGET_CHANGED"; n: number }
   | { type: "STATUS"; status: Status }
@@ -68,6 +76,7 @@ const initialState: State = {
   events: [],
   selectedId: null,
   exhibitors: [],
+  filter: { tag: "all", search: "" },
   countryWeights: {},
   targetCount: 50,
   rankedData: [],
@@ -85,6 +94,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         selectedId: action.id,
         exhibitors: [],
+        filter: { tag: "all", search: "" },
         countryWeights: {},
         rankedData: [],
         cachedScoredAt: null,
@@ -112,6 +122,8 @@ function reducer(state: State, action: Action): State {
             : e,
         ),
       };
+    case "FILTER_CHANGED":
+      return { ...state, filter: action.filter };
     case "WEIGHTS_CHANGED":
       return { ...state, countryWeights: action.weights };
     case "TARGET_CHANGED":
@@ -212,6 +224,31 @@ export default function LibraryPage() {
   const weightRows: ParsedRow[] = useMemo(
     () => state.exhibitors.map((e) => ({ country: e.country })),
     [state.exhibitors],
+  );
+
+  const filterCounts = useMemo(() => {
+    const c: Record<FilterTag, number> = {
+      all: state.exhibitors.length,
+      untagged: 0,
+      customer: 0,
+      prospect: 0,
+      won: 0,
+      lost: 0,
+    };
+    for (const e of state.exhibitors) {
+      if (e.tag === null) c.untagged += 1;
+      else c[e.tag] += 1;
+    }
+    return c;
+  }, [state.exhibitors]);
+
+  const visibleExhibitors = useMemo(
+    () =>
+      applyFilter(state.exhibitors, state.filter, (e) => ({
+        tag: e.tag,
+        searchText: `${e.raw_name} ${e.country} ${e.industry ?? ""}`,
+      })),
+    [state.exhibitors, state.filter],
   );
 
   const selectedEvent = state.events.find((e) => e.id === state.selectedId);
@@ -384,7 +421,15 @@ export default function LibraryPage() {
       {state.exhibitors.length > 0 && (
         <ExhibitorPreview
           exhibitors={state.exhibitors}
+          visible={visibleExhibitors}
           onTagChange={handleTagChange}
+          filterChildren={
+            <FilterBar
+              filter={state.filter}
+              counts={filterCounts}
+              onChange={(filter) => dispatch({ type: "FILTER_CHANGED", filter })}
+            />
+          }
         />
       )}
 

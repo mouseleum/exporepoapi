@@ -5,10 +5,10 @@ import { TagPicker } from "./TagPicker";
 
 type ExhibitorPreviewProps = {
   exhibitors: LibraryExhibitor[];
+  visible?: LibraryExhibitor[];
   onTagChange?: (name_normalized: string, tag: TagValue | null) => void;
+  filterChildren?: React.ReactNode;
 };
-
-const PREVIEW_LIMIT = 50;
 
 function formatEmployees(n: number | null): string {
   if (n === null) return "—";
@@ -17,21 +17,28 @@ function formatEmployees(n: number | null): string {
 
 export function ExhibitorPreview({
   exhibitors,
+  visible,
   onTagChange,
+  filterChildren,
 }: ExhibitorPreviewProps) {
   const total = exhibitors.length;
   const matched = exhibitors.filter((e) => e.apollo_matched).length;
-  const visible = exhibitors.slice(0, PREVIEW_LIMIT);
-  const overflow = Math.max(0, total - visible.length);
+  const rows = visible ?? exhibitors;
+  const filtered = rows.length !== total;
 
   return (
     <div className="exhibitor-preview">
       <div className="exhibitor-preview-header">
         <span className="exhibitor-preview-title">Exhibitors</span>
         <span className="exhibitor-preview-count">
+          {filtered ? `${rows.length} of ${total} · ` : ""}
           {matched} / {total} enriched from Apollo
         </span>
       </div>
+      {filterChildren}
+      {rows.length === 0 ? (
+        <div className="empty-state">No exhibitors match the current filter.</div>
+      ) : (
       <div className="table-wrap">
         <table>
           <thead>
@@ -47,7 +54,7 @@ export function ExhibitorPreview({
             </tr>
           </thead>
           <tbody>
-            {visible.map((row) => (
+            {rows.map((row) => (
               <tr key={row.name_normalized}>
                 <td className="company-cell">{row.raw_name}</td>
                 <td className="country-cell">{row.country || "—"}</td>
@@ -74,10 +81,6 @@ export function ExhibitorPreview({
           </tbody>
         </table>
       </div>
-      {overflow > 0 && (
-        <div className="exhibitor-preview-overflow">
-          …and {overflow} more
-        </div>
       )}
     </div>
   );

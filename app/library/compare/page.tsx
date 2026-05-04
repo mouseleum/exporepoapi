@@ -1,24 +1,33 @@
 "use client";
 
-import { useEffect, useReducer } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 import { Header } from "@/components/Header";
 import { TopNav } from "@/components/TopNav";
 import { StatusBox } from "@/components/StatusBox";
+import { FilterBar } from "@/components/library/FilterBar";
 import { getCrossEventExhibitors } from "@/app/library/actions";
 import type { CrossEventCompany } from "@/lib/library/queries";
+import {
+  applyFilter,
+  type FilterState,
+  type FilterTag,
+} from "@/lib/library/filters";
 import type { Status } from "@/lib/types";
 
 type State = {
   rows: CrossEventCompany[];
+  filter: FilterState;
   status: Status;
 };
 
 type Action =
   | { type: "ROWS_LOADED"; rows: CrossEventCompany[] }
+  | { type: "FILTER_CHANGED"; filter: FilterState }
   | { type: "STATUS"; status: Status };
 
 const initialState: State = {
   rows: [],
+  filter: { tag: "all", search: "" },
   status: { kind: "idle" },
 };
 
@@ -26,6 +35,8 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "ROWS_LOADED":
       return { ...state, rows: action.rows, status: { kind: "idle" } };
+    case "FILTER_CHANGED":
+      return { ...state, filter: action.filter };
     case "STATUS":
       return { ...state, status: action.status };
   }
@@ -69,6 +80,31 @@ export default function ComparePage() {
 
   const { rows } = state;
 
+  const filterCounts = useMemo(() => {
+    const c: Record<FilterTag, number> = {
+      all: rows.length,
+      untagged: 0,
+      customer: 0,
+      prospect: 0,
+      won: 0,
+      lost: 0,
+    };
+    for (const r of rows) {
+      if (r.tag === null) c.untagged += 1;
+      else c[r.tag] += 1;
+    }
+    return c;
+  }, [rows]);
+
+  const visibleRows = useMemo(
+    () =>
+      applyFilter(rows, state.filter, (r) => ({
+        tag: r.tag,
+        searchText: `${r.display_name} ${r.country} ${r.industry ?? ""}`,
+      })),
+    [rows, state.filter],
+  );
+
   return (
     <div className="wrap">
       <Header />
@@ -92,8 +128,22 @@ export default function ComparePage() {
         <div className="results-section">
           <div className="results-header">
             <span className="results-title">Cross-event exhibitors</span>
-            <span className="results-count">{rows.length}</span>
+            <span className="results-count">
+              {visibleRows.length !== rows.length
+                ? `${visibleRows.length} / ${rows.length}`
+                : rows.length}
+            </span>
           </div>
+          <FilterBar
+            filter={state.filter}
+            counts={filterCounts}
+            onChange={(filter) => dispatch({ type: "FILTER_CHANGED", filter })}
+          />
+          {visibleRows.length === 0 ? (
+            <div className="empty-state">
+              No companies match the current filter.
+            </div>
+          ) : (
           <div className="table-wrap">
             <table>
               <thead>
@@ -107,7 +157,7 @@ export default function ComparePage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {visibleRows.map((r) => (
                   <tr key={r.name_normalized}>
                     <td className="company-cell">{r.display_name}</td>
                     <td className="country-cell">{r.country || "—"}</td>
@@ -135,6 +185,7 @@ export default function ComparePage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
 

@@ -705,6 +705,35 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
 .bulk-tag-filter-won.active { border-color: var(--color-accent); color: var(--color-accent); }
 .bulk-tag-filter-lost.active { border-color: var(--color-border2); color: var(--color-muted); }
 
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.filter-bar .bulk-tag-filters {
+  margin-bottom: 0;
+}
+.filter-search {
+  flex: 1;
+  min-width: 200px;
+  background: transparent;
+  border: 1px solid var(--color-border2);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text);
+}
+.filter-search:focus {
+  outline: none;
+  border-color: var(--color-accent-blue);
+}
+.filter-search::placeholder {
+  color: var(--color-muted2);
+}
+
 /* Library: exhibitor preview */
 .exhibitor-preview {
   margin-top: 24px;
