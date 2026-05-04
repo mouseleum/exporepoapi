@@ -27,6 +27,8 @@ import { CountryWeights } from "./CountryWeights";
 import { TargetCountSlider } from "./TargetCountSlider";
 import { ActionButtons } from "./ActionButtons";
 import { ResultsTable } from "./ResultsTable";
+import { SaveToLibrary } from "./SaveToLibrary";
+import { saveEventFromCsv } from "@/app/library/actions";
 
 type State = {
   parsedRows: ParsedRow[];
@@ -40,6 +42,7 @@ type State = {
   status: Status;
   isScoring: boolean;
   isSaving: boolean;
+  isSavingLibrary: boolean;
 };
 
 type Action =
@@ -59,7 +62,9 @@ type Action =
   | { type: "SCORE_SUCCESS"; data: RankedRow[] }
   | { type: "SCORE_END" }
   | { type: "SAVE_START" }
-  | { type: "SAVE_END" };
+  | { type: "SAVE_END" }
+  | { type: "SAVE_LIBRARY_START" }
+  | { type: "SAVE_LIBRARY_END" };
 
 const initialState: State = {
   parsedRows: [],
@@ -73,6 +78,7 @@ const initialState: State = {
   status: { kind: "idle" },
   isScoring: false,
   isSaving: false,
+  isSavingLibrary: false,
 };
 
 function reducer(state: State, action: Action): State {
@@ -111,6 +117,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, isSaving: true };
     case "SAVE_END":
       return { ...state, isSaving: false };
+    case "SAVE_LIBRARY_START":
+      return { ...state, isSavingLibrary: true };
+    case "SAVE_LIBRARY_END":
+      return { ...state, isSavingLibrary: false };
   }
 }
 
@@ -397,6 +407,79 @@ export function RankerTab() {
     }
   };
 
+  const saveToLibrary = async (meta: {
+    name: string;
+    slug: string;
+    year: number | null;
+  }) => {
+    if (!state.selection.name) {
+      dispatch({
+        type: "STATUS",
+        status: {
+          kind: "error",
+          message: "Please select the company name column.",
+        },
+      });
+      return;
+    }
+    const { name: nameCol, country: countryCol, hall: hallCol } = state.selection;
+    const rows = state.parsedRows
+      .map((r) => ({
+        raw_name: String(r[nameCol] ?? "").trim(),
+        country: countryCol ? String(r[countryCol] ?? "").trim() : null,
+        hall: hallCol ? String(r[hallCol] ?? "").trim() : null,
+        booth: null as string | null,
+      }))
+      .filter((r) => r.raw_name.length > 1);
+    if (!rows.length) {
+      dispatch({
+        type: "STATUS",
+        status: { kind: "error", message: "No valid company names found." },
+      });
+      return;
+    }
+
+    dispatch({ type: "SAVE_LIBRARY_START" });
+    dispatch({
+      type: "STATUS",
+      status: {
+        kind: "loading",
+        message: `Saving ${rows.length} exhibitors to Library as ${meta.slug}...`,
+      },
+    });
+    try {
+      const result = await saveEventFromCsv(
+        {
+          name: meta.name,
+          slug: meta.slug,
+          year: meta.year,
+          source: "csv",
+          source_url: null,
+        },
+        rows,
+      );
+      const dupNote =
+        result.dupes_skipped > 0
+          ? ` (${result.dupes_skipped} duplicates skipped)`
+          : "";
+      dispatch({
+        type: "STATUS",
+        status: {
+          kind: "info",
+          message: `✓ Saved to Library — ${result.exhibitor_count} exhibitors under "${result.slug}"${dupNote}`,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      dispatch({
+        type: "STATUS",
+        status: { kind: "error", message: "Library save failed: " + message },
+      });
+    } finally {
+      dispatch({ type: "SAVE_LIBRARY_END" });
+    }
+  };
+
   const downloadCSV = () => {
     if (!state.rankedData.length) return;
     const header = "Rank,Company,Country,Hall/Booth,Employees,Industry,Score\n";
@@ -449,6 +532,11 @@ export function RankerTab() {
             isSaving={state.isSaving}
             onScore={runScoring}
             onSave={saveToDBOnly}
+          />
+          <SaveToLibrary
+            defaultName={sourceName()}
+            isSaving={state.isSavingLibrary}
+            onSave={saveToLibrary}
           />
         </div>
       )}

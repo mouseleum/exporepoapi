@@ -5,10 +5,14 @@ import {
   getEventExhibitors as _getEventExhibitors,
   getCrossEventExhibitors as _getCrossEventExhibitors,
   setCompanyTag as _setCompanyTag,
+  saveEventWithExhibitors as _saveEventWithExhibitors,
   type EventListItem,
   type LibraryExhibitor,
   type CrossEventCompany,
   type TagValue,
+  type SaveEventInput,
+  type SaveEventRow,
+  type SaveEventResult,
 } from "@/lib/library/queries";
 
 export async function listEvents(): Promise<EventListItem[]> {
@@ -30,4 +34,11 @@ export async function setCompanyTag(
   tag: TagValue | null,
 ): Promise<void> {
   return _setCompanyTag(name_normalized, tag);
+}
+
+export async function saveEventFromCsv(
+  meta: SaveEventInput,
+  rows: SaveEventRow[],
+): Promise<SaveEventResult> {
+  return _saveEventWithExhibitors(meta, rows);
 }

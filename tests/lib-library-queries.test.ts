@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  dedupeForSave,
   groupCrossEventCompanies,
   joinEventExhibitors,
   tagsByName,
@@ -392,5 +393,47 @@ describe("groupCrossEventCompanies with tags", () => {
       [{ name_normalized: "acme", tag: "won" }],
     );
     expect(result[0]?.tag).toBe("won");
+  });
+});
+
+describe("dedupeForSave", () => {
+  it("normalizes raw_name and dedupes by name_normalized", () => {
+    const result = dedupeForSave([
+      { raw_name: "Acme Corp", country: "US", hall: null, booth: null },
+      { raw_name: "ACME CORP!", country: "US", hall: null, booth: null },
+      { raw_name: "Beta Ltd", country: "UK", hall: null, booth: null },
+    ]);
+    expect(result.dupes).toBe(1);
+    expect(result.rows.map((r) => r.name_normalized)).toEqual([
+      "acmecorp",
+      "betaltd",
+    ]);
+  });
+
+  it("trims whitespace and skips rows with raw_name length < 2", () => {
+    const result = dedupeForSave([
+      { raw_name: "  X  ", country: null, hall: null, booth: null },
+      { raw_name: "  Real Co  ", country: null, hall: null, booth: null },
+      { raw_name: "", country: null, hall: null, booth: null },
+    ]);
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.raw_name).toBe("Real Co");
+  });
+
+  it("returns no rows and no dupes for empty input", () => {
+    expect(dedupeForSave([])).toEqual({ rows: [], dupes: 0 });
+  });
+
+  it("preserves country/hall/booth on the deduped row", () => {
+    const result = dedupeForSave([
+      { raw_name: "Acme", country: "US", hall: "1", booth: "A1" },
+    ]);
+    expect(result.rows[0]).toMatchObject({
+      raw_name: "Acme",
+      country: "US",
+      hall: "1",
+      booth: "A1",
+      name_normalized: "acme",
+    });
   });
 });

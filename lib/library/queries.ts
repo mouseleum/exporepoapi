@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "../supabase";
+import { normalizeName } from "../normalize";
 
 export type EventListItem = {
   id: string;
@@ -268,6 +269,105 @@ export async function getEventExhibitors(
     (apolloRes.data as ApolloRow[] | null) ?? [],
     (tagsRes.data as TagRow[] | null) ?? [],
   );
+}
+
+export type SaveEventInput = {
+  name: string;
+  slug: string;
+  year: number | null;
+  source: string;
+  source_url: string | null;
+};
+
+export type SaveEventRow = {
+  raw_name: string;
+  country?: string | null;
+  hall?: string | null;
+  booth?: string | null;
+};
+
+export type SaveEventResult = {
+  event_id: string;
+  slug: string;
+  exhibitor_count: number;
+  dupes_skipped: number;
+};
+
+export function dedupeForSave(rows: SaveEventRow[]): {
+  rows: Array<SaveEventRow & { name_normalized: string }>;
+  dupes: number;
+} {
+  const seen = new Set<string>();
+  const out: Array<SaveEventRow & { name_normalized: string }> = [];
+  let dupes = 0;
+  for (const r of rows) {
+    const raw = r.raw_name.trim();
+    if (raw.length < 2) continue;
+    const name_normalized = normalizeName(raw);
+    if (!name_normalized) continue;
+    if (seen.has(name_normalized)) {
+      dupes++;
+      continue;
+    }
+    seen.add(name_normalized);
+    out.push({ ...r, raw_name: raw, name_normalized });
+  }
+  return { rows: out, dupes };
+}
+
+const SAVE_BATCH_SIZE = 500;
+
+export async function saveEventWithExhibitors(
+  meta: SaveEventInput,
+  rows: SaveEventRow[],
+  supabase: SupabaseClient = createServiceClient(),
+): Promise<SaveEventResult> {
+  const { rows: deduped, dupes } = dedupeForSave(rows);
+  if (deduped.length === 0) {
+    throw new Error("No valid exhibitor rows to save.");
+  }
+
+  const eventRow = {
+    source: meta.source,
+    slug: meta.slug,
+    name: meta.name,
+    year: meta.year,
+    source_url: meta.source_url,
+    scraped_at: new Date().toISOString(),
+  };
+  const { data: eventInsert, error: eventErr } = await supabase
+    .from("events")
+    .upsert(eventRow, { onConflict: "slug" })
+    .select("id")
+    .single();
+  if (eventErr || !eventInsert) {
+    throw new Error(`saveEvent events: ${eventErr?.message ?? "no row returned"}`);
+  }
+  const event_id = eventInsert.id as string;
+
+  const eeRows = deduped.map((r) => ({
+    event_id,
+    raw_name: r.raw_name,
+    name_normalized: r.name_normalized,
+    country: r.country?.trim() || null,
+    hall: r.hall?.trim() || null,
+    booth: r.booth?.trim() || null,
+  }));
+
+  for (let i = 0; i < eeRows.length; i += SAVE_BATCH_SIZE) {
+    const batch = eeRows.slice(i, i + SAVE_BATCH_SIZE);
+    const { error } = await supabase
+      .from("event_exhibitors")
+      .upsert(batch, { onConflict: "event_id,name_normalized" });
+    if (error) throw new Error(`saveEvent event_exhibitors: ${error.message}`);
+  }
+
+  return {
+    event_id,
+    slug: meta.slug,
+    exhibitor_count: eeRows.length,
+    dupes_skipped: dupes,
+  };
 }
 
 export async function setCompanyTag(
