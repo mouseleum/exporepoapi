@@ -6,10 +6,18 @@ import { normalizeName } from "../lib/normalize";
 import type { Adapter } from "../lib/adapters/types";
 import { cyberseceuropeAdapter } from "../lib/adapters/cyberseceurope";
 import { interpackAdapter } from "../lib/adapters/interpack";
+import { drupaAdapter } from "../lib/adapters/drupa";
+import { medicaAdapter } from "../lib/adapters/medica";
+import { glasstecAdapter } from "../lib/adapters/glasstec";
+import { bootAdapter } from "../lib/adapters/boot";
 
 const ADAPTERS: Record<string, Adapter> = {
   cyberseceurope: cyberseceuropeAdapter,
   interpack: interpackAdapter,
+  drupa: drupaAdapter,
+  medica: medicaAdapter,
+  glasstec: glasstecAdapter,
+  boot: bootAdapter,
 };
 
 const BATCH_SIZE = 500;
