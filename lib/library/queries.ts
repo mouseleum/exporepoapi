@@ -64,6 +64,7 @@ type ApolloRow = {
 };
 
 const IN_CHUNK = 500;
+const PAGE_SIZE = 1000;
 
 async function chunkedInLookup<T>(
   keys: string[],
@@ -188,11 +189,18 @@ export function groupCrossEventCompanies(
 export async function getCrossEventExhibitors(
   supabase: SupabaseClient = createServiceClient(),
 ): Promise<CrossEventCompany[]> {
-  const { data: ees, error: eeErr } = await supabase
-    .from("event_exhibitors")
-    .select("raw_name, country, hall, booth, name_normalized, event_id");
-  if (eeErr) throw new Error(`getCrossEventExhibitors ee: ${eeErr.message}`);
-  if (!ees || ees.length === 0) return [];
+  const ees: EeWithEvent[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("event_exhibitors")
+      .select("raw_name, country, hall, booth, name_normalized, event_id")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`getCrossEventExhibitors ee: ${error.message}`);
+    if (!data || data.length === 0) break;
+    ees.push(...(data as EeWithEvent[]));
+    if (data.length < PAGE_SIZE) break;
+  }
+  if (ees.length === 0) return [];
 
   const { data: events, error: evErr } = await supabase
     .from("events")
@@ -267,13 +275,20 @@ export async function getEventExhibitors(
   eventId: string,
   supabase: SupabaseClient = createServiceClient(),
 ): Promise<LibraryExhibitor[]> {
-  const { data: ees, error: eeErr } = await supabase
-    .from("event_exhibitors")
-    .select("raw_name, country, hall, booth, name_normalized")
-    .eq("event_id", eventId)
-    .order("raw_name", { ascending: true });
-  if (eeErr) throw new Error(`getEventExhibitors: ${eeErr.message}`);
-  if (!ees || ees.length === 0) return [];
+  const ees: EeRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("event_exhibitors")
+      .select("raw_name, country, hall, booth, name_normalized")
+      .eq("event_id", eventId)
+      .order("raw_name", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`getEventExhibitors: ${error.message}`);
+    if (!data || data.length === 0) break;
+    ees.push(...(data as EeRow[]));
+    if (data.length < PAGE_SIZE) break;
+  }
+  if (ees.length === 0) return [];
 
   const normalized = ees.map((r) => r.name_normalized as string);
   const [apollos, tags] = await Promise.all([

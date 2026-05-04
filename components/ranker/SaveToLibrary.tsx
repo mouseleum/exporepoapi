@@ -8,7 +8,10 @@ export function slugify(name: string, year: number | null): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   if (!base) return "";
-  return year ? `${base}-${year}` : base;
+  if (!year) return base;
+  const yearStr = String(year);
+  if (base === yearStr || base.endsWith(`-${yearStr}`)) return base;
+  return `${base}-${yearStr}`;
 }
 
 type SaveToLibraryProps = {
