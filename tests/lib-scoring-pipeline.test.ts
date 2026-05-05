@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runScoringPipeline } from "../lib/scoring-pipeline";
+
+type SyncArgs = [Array<unknown>, string];
+type SyncResult = { added: number; updated: number; total: number };
+const syncMock = vi.fn<(...args: SyncArgs) => Promise<SyncResult>>(
+  async () => ({ added: 1, updated: 0, total: 1 }),
+);
+vi.mock("@/app/library/actions", () => ({
+  syncCompaniesToDb: (...args: SyncArgs) => syncMock(...args),
+}));
+
+const { runScoringPipeline } = await import("../lib/scoring-pipeline");
 import type { Status } from "../lib/types";
 
 type Init = RequestInit | undefined;
@@ -21,8 +31,6 @@ type FetchMockOpts = {
     booth: string;
     score: number;
   }>;
-  syncResponse?: { added: number; updated: number; total: number };
-  syncFails?: boolean;
 };
 
 type MockResponse = {
@@ -50,23 +58,6 @@ function setupFetchMocks(opts: FetchMockOpts) {
         ok: true,
         status: 200,
         json: async () => opts.companyDb?.companies ?? [],
-        text: () => Promise.resolve(""),
-      };
-    }
-    if (url.includes("company-db-agent.vercel.app/api/sync")) {
-      if (opts.syncFails) {
-        return {
-          ok: false,
-          status: 500,
-          json: async () => ({ error: "sync boom" }),
-          text: async () => "sync boom",
-        };
-      }
-      return {
-        ok: true,
-        status: 200,
-        json: async () =>
-          opts.syncResponse ?? { added: 1, updated: 0, total: 1 },
         text: () => Promise.resolve(""),
       };
     }
@@ -116,7 +107,8 @@ function urlsCalled(calls: Array<{ url: string }>): string[] {
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  vi.restoreAllMocks();
+  syncMock.mockReset();
+  syncMock.mockResolvedValue({ added: 1, updated: 0, total: 1 });
 });
 
 describe("runScoringPipeline", () => {
@@ -155,7 +147,7 @@ describe("runScoringPipeline", () => {
     expect(urls.some((u) => u.includes("/api/companies"))).toBe(true);
     expect(urls.some((u) => u.includes("/api/enrich"))).toBe(true);
     expect(urls.some((u) => u.includes("/api/score"))).toBe(true);
-    expect(urls.some((u) => u.includes("/api/sync"))).toBe(true);
+    expect(syncMock).toHaveBeenCalledTimes(1);
   });
 
   it("prefilledEnriched names skip PDL", async () => {
@@ -246,8 +238,8 @@ describe("runScoringPipeline", () => {
     const events: string[] = [];
     setupFetchMocks({
       score: [{ rank: 1, name: "Y", country: "", booth: "", score: 60 }],
-      syncResponse: { added: 0, updated: 1, total: 5 },
     });
+    syncMock.mockResolvedValue({ added: 0, updated: 1, total: 5 });
 
     await runScoringPipeline(
       [{ name: "Y" }],
@@ -295,8 +287,8 @@ describe("runScoringPipeline", () => {
     setupFetchMocks({
       pdl: [{ name: "Q", matched: false }],
       score: [{ rank: 1, name: "Q", country: "", booth: "", score: 40 }],
-      syncFails: true,
     });
+    syncMock.mockRejectedValue(new Error("sync boom"));
 
     const errorMessages: string[] = [];
     await runScoringPipeline(
@@ -312,8 +304,8 @@ describe("runScoringPipeline", () => {
     expect(errorMessages.some((m) => m.includes("DB sync error"))).toBe(true);
   });
 
-  it("source is forwarded to syncToDB", async () => {
-    const { calls } = setupFetchMocks({
+  it("source is forwarded to syncCompaniesToDb", async () => {
+    setupFetchMocks({
       pdl: [{ name: "Foo", matched: false }],
       score: [{ rank: 1, name: "Foo", country: "", booth: "", score: 70 }],
     });
@@ -324,9 +316,7 @@ describe("runScoringPipeline", () => {
       { onStatus: () => {} },
     );
 
-    const syncCall = calls.find((c) => c.url.includes("/api/sync"));
-    expect(syncCall).toBeDefined();
-    const body = syncCall?.body as { source?: string } | undefined;
-    expect(body?.source).toBe("my-event-slug");
+    expect(syncMock).toHaveBeenCalledTimes(1);
+    expect(syncMock.mock.calls[0]?.[1]).toBe("my-event-slug");
   });
 });

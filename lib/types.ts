@@ -54,12 +54,6 @@ export type CompanyDbCache = {
   byNormalized: Map<string, CompanyDbEntry>;
 };
 
-export type SyncResponse = {
-  added: number;
-  updated: number;
-  total: number;
-};
-
 export type StatusKind = "idle" | "loading" | "info" | "error";
 
 export type Status =

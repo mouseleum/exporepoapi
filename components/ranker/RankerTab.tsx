@@ -9,7 +9,7 @@ import {
   apiFetch,
   extractTextFromAnthropic,
 } from "@/lib/api-client";
-import { syncToDB } from "@/lib/company-db";
+import { syncCompaniesToDb } from "@/app/library/actions";
 import { buildPdfExtractPrompt } from "@/lib/prompts";
 import { ExtractedCompaniesSchema } from "@/lib/schemas";
 import { runScoringPipeline } from "@/lib/scoring-pipeline";
@@ -388,7 +388,7 @@ export function RankerTab() {
       },
     });
     try {
-      const result = await syncToDB(rows, sourceName());
+      const result = await syncCompaniesToDb(rows, sourceName());
       dispatch({
         type: "STATUS",
         status: {

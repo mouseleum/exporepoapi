@@ -1,9 +1,5 @@
-import { CompanyDbListSchema, SyncResponseSchema } from "./schemas";
-import type {
-  CompanyDbCache,
-  CompanyDbEntry,
-  SyncResponse,
-} from "./types";
+import { CompanyDbListSchema } from "./schemas";
+import type { CompanyDbCache, CompanyDbEntry } from "./types";
 
 const DB_URL = "https://company-db-agent.vercel.app";
 
@@ -46,32 +42,3 @@ export function lookupInDB(
   return db.byRaw.get(key) ?? db.byNormalized.get(key) ?? null;
 }
 
-export type SyncCompany = {
-  name: string;
-  country: string | null;
-  employees?: number | null;
-  industry?: string | null;
-};
-
-export async function syncToDB(
-  companies: SyncCompany[],
-  source: string,
-): Promise<SyncResponse> {
-  const res = await fetch(DB_URL + "/api/sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ companies, source }),
-  });
-  const json: unknown = await res.json();
-  if (!res.ok) {
-    const errMsg =
-      typeof json === "object" &&
-      json !== null &&
-      "error" in json &&
-      typeof (json as { error: unknown }).error === "string"
-        ? (json as { error: string }).error
-        : "Sync failed";
-    throw new Error(errMsg);
-  }
-  return SyncResponseSchema.parse(json);
-}

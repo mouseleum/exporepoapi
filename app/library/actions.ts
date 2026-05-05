@@ -8,6 +8,7 @@ import {
   saveEventWithExhibitors as _saveEventWithExhibitors,
   bulkSetCompanyTags as _bulkSetCompanyTags,
   listTaggedCompanies as _listTaggedCompanies,
+  syncCompaniesToDb as _syncCompaniesToDb,
   type EventListItem,
   type LibraryExhibitor,
   type CrossEventCompany,
@@ -17,6 +18,8 @@ import {
   type SaveEventResult,
   type BulkTagResult,
   type TaggedCompanyRow,
+  type SyncCompanyInput,
+  type SyncDbResult,
 } from "@/lib/library/queries";
 
 export async function listEvents(): Promise<EventListItem[]> {
@@ -56,4 +59,11 @@ export async function bulkSetCompanyTags(
 
 export async function listTaggedCompanies(): Promise<TaggedCompanyRow[]> {
   return _listTaggedCompanies();
+}
+
+export async function syncCompaniesToDb(
+  companies: SyncCompanyInput[],
+  source: string,
+): Promise<SyncDbResult> {
+  return _syncCompaniesToDb(companies, source);
 }

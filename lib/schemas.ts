@@ -77,9 +77,3 @@ export const CompanyDbEntrySchema = z
   .passthrough();
 
 export const CompanyDbListSchema = z.array(CompanyDbEntrySchema);
-
-export const SyncResponseSchema = z.object({
-  added: z.number(),
-  updated: z.number(),
-  total: z.number(),
-});

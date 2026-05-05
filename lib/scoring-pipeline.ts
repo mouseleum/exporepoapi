@@ -1,5 +1,6 @@
+import { syncCompaniesToDb } from "@/app/library/actions";
 import { enrichCompanies } from "./api-client";
-import { loadDB, lookupInDB, syncToDB } from "./company-db";
+import { loadDB, lookupInDB } from "./company-db";
 import { scoreCompanies, type ScorableCompany } from "./scorer";
 import type {
   CountryWeights,
@@ -124,7 +125,7 @@ export async function runScoringPipeline(
     };
   });
   try {
-    const result = await syncToDB(syncPayload, options.source);
+    const result = await syncCompaniesToDb(syncPayload, options.source);
     callbacks.onStatus({
       kind: "info",
       message: `✓ Synced to company DB — ${result.added} new, ${result.updated} updated (${result.total} total)`,

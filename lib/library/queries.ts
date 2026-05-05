@@ -555,3 +555,118 @@ export async function setCompanyTag(
     );
   if (error) throw new Error(`setCompanyTag upsert: ${error.message}`);
 }
+
+export type SyncCompanyInput = {
+  name: string;
+  country?: string | null;
+  employees?: number | null;
+  industry?: string | null;
+};
+
+export type SyncDbResult = {
+  added: number;
+  updated: number;
+  total: number;
+};
+
+type ExistingCompany = {
+  id: string;
+  name_normalized: string;
+  country: string | null;
+  employees: number | null;
+  industry: string | null;
+};
+
+export async function syncCompaniesToDb(
+  companies: SyncCompanyInput[],
+  source: string,
+  supabase: SupabaseClient = createServiceClient(),
+): Promise<SyncDbResult> {
+  const seen = new Set<string>();
+  const rows = companies
+    .map((c) => {
+      const name = (c.name ?? "").trim();
+      if (name.length < 2) return null;
+      const name_normalized = normalizeName(name);
+      if (!name_normalized || seen.has(name_normalized)) return null;
+      seen.add(name_normalized);
+      const country = (c.country ?? "").trim() || null;
+      return {
+        name,
+        name_normalized,
+        country,
+        employees: c.employees ?? null,
+        industry: c.industry ?? null,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  if (rows.length === 0) return { added: 0, updated: 0, total: 0 };
+
+  const existing = await chunkedInLookup<ExistingCompany>(
+    rows.map((r) => r.name_normalized),
+    (chunk) =>
+      supabase
+        .from("companies")
+        .select("id, name_normalized, country, employees, industry")
+        .in("name_normalized", chunk),
+    "syncCompaniesToDb existing",
+  );
+  const existingMap = new Map<string, ExistingCompany>();
+  for (const e of existing) existingMap.set(e.name_normalized, e);
+
+  const inserts: Array<{
+    apollo_account_id: string;
+    source: string;
+    name: string;
+    name_normalized: string;
+    country: string | null;
+    employees: number | null;
+    industry: string | null;
+  }> = [];
+  const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
+
+  for (const r of rows) {
+    const ex = existingMap.get(r.name_normalized);
+    if (ex) {
+      const patch: Record<string, unknown> = {};
+      if (r.country && !ex.country) patch.country = r.country;
+      if (r.employees != null && ex.employees == null)
+        patch.employees = r.employees;
+      if (r.industry && !ex.industry) patch.industry = r.industry;
+      if (Object.keys(patch).length > 0) {
+        patch.updated_at = new Date().toISOString();
+        updates.push({ id: ex.id, patch });
+      }
+    } else {
+      inserts.push({
+        apollo_account_id: `${source}:${r.name_normalized}`,
+        source,
+        name: r.name,
+        name_normalized: r.name_normalized,
+        country: r.country,
+        employees: r.employees,
+        industry: r.industry,
+      });
+    }
+  }
+
+  for (const u of updates) {
+    const { error } = await supabase
+      .from("companies")
+      .update(u.patch)
+      .eq("id", u.id);
+    if (error) throw new Error(`syncCompaniesToDb update: ${error.message}`);
+  }
+
+  if (inserts.length > 0) {
+    const { error } = await supabase.from("companies").insert(inserts);
+    if (error) throw new Error(`syncCompaniesToDb insert: ${error.message}`);
+  }
+
+  return {
+    added: inserts.length,
+    updated: updates.length,
+    total: rows.length,
+  };
+}
