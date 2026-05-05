@@ -26,6 +26,7 @@ import {
   type FilterState,
   type FilterTag,
 } from "@/lib/library/filters";
+import { formatRevenueUsd } from "@/lib/library/format";
 import type {
   EventListItem,
   LibraryExhibitor,
@@ -294,7 +295,7 @@ export default function LibraryPage() {
         employee_count: e.employees,
         employee_range: null,
         industry: e.industry,
-        revenue_range: null,
+        revenue_range: formatRevenueUsd(e.annual_revenue),
         founded: null,
         linkedin_url: null,
         tags: [],
@@ -343,13 +344,13 @@ export default function LibraryPage() {
 
   const downloadCSV = () => {
     if (!state.rankedData.length) return;
-    const header = "Rank,Company,Country,Hall/Booth,Employees,Industry,Score\n";
+    const header = "Rank,Company,Country,Hall/Booth,Employees,Industry,Revenue,Score\n";
     const rows = state.rankedData
       .map(
         (r) =>
           `${r.rank},"${csvEscape(r.name)}","${csvEscape(r.country)}","${csvEscape(r.hall)}","${csvEscape(
             r.employees,
-          )}","${csvEscape(r.industry)}",${r.score}`,
+          )}","${csvEscape(r.industry)}","${csvEscape(r.revenue)}",${r.score}`,
       )
       .join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });

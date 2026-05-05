@@ -54,6 +54,7 @@ export function ResultsTable({ data, onDownload }: ResultsTableProps) {
               <th>Hall / Booth</th>
               <th>Employees</th>
               <th>Industry</th>
+              <th>Revenue</th>
               <th>Score</th>
             </tr>
           </thead>
@@ -70,6 +71,7 @@ export function ResultsTable({ data, onDownload }: ResultsTableProps) {
                     {formatEmployees(row.employees)}
                   </td>
                   <td className="industry-cell">{row.industry ?? "—"}</td>
+                  <td className="country-cell">{row.revenue ?? "—"}</td>
                   <td className="score-cell">
                     <div className="score-bar-wrap">
                       <div className="score-bar">

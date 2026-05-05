@@ -34,6 +34,7 @@ describe("joinEventExhibitors", () => {
         booth: null,
         employees: null,
         industry: null,
+        annual_revenue: null,
         apollo_matched: false,
         tag: null,
       },
@@ -57,6 +58,7 @@ describe("joinEventExhibitors", () => {
           country: "Netherlands",
           employees: 68000,
           industry: "lighting",
+          annual_revenue: null,
         },
       ],
     );
@@ -86,6 +88,7 @@ describe("joinEventExhibitors", () => {
           country: "US",
           employees: 200,
           industry: "tech",
+          annual_revenue: null,
         },
       ],
     );
@@ -109,6 +112,7 @@ describe("joinEventExhibitors", () => {
           country: "US",
           employees: 200,
           industry: "tech",
+          annual_revenue: null,
         },
       ],
     );
@@ -132,6 +136,7 @@ describe("joinEventExhibitors", () => {
           country: null,
           employees: null,
           industry: null,
+          annual_revenue: null,
         },
       ],
     );
@@ -256,6 +261,7 @@ describe("groupCrossEventCompanies", () => {
           country: "Netherlands",
           employees: 68000,
           industry: "lighting",
+          annual_revenue: null,
         },
       ],
     );
@@ -294,6 +300,7 @@ describe("groupCrossEventCompanies", () => {
           country: "US",
           employees: null,
           industry: null,
+          annual_revenue: null,
         },
       ],
     );

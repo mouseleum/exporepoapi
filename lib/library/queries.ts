@@ -22,6 +22,7 @@ export type LibraryExhibitor = {
   booth: string | null;
   employees: number | null;
   industry: string | null;
+  annual_revenue: number | null;
   apollo_matched: boolean;
   tag: TagValue | null;
 };
@@ -33,6 +34,7 @@ export type CrossEventCompany = {
   country: string;
   employees: number | null;
   industry: string | null;
+  annual_revenue: number | null;
   apollo_matched: boolean;
   tag: TagValue | null;
 };
@@ -61,6 +63,7 @@ type ApolloRow = {
   country: string | null;
   employees: number | null;
   industry: string | null;
+  annual_revenue: number | null;
 };
 
 const IN_CHUNK = 500;
@@ -109,6 +112,7 @@ export function joinEventExhibitors(
       booth: ee.booth,
       employees: apollo?.employees ?? null,
       industry: apollo?.industry ?? null,
+      annual_revenue: apollo?.annual_revenue ?? null,
       apollo_matched: !!apollo,
       tag: tagMap.get(ee.name_normalized) ?? null,
     };
@@ -173,6 +177,7 @@ export function groupCrossEventCompanies(
       country: bucket.countryFromEe || apollo?.country || "",
       employees: apollo?.employees ?? null,
       industry: apollo?.industry ?? null,
+      annual_revenue: apollo?.annual_revenue ?? null,
       apollo_matched: !!apollo,
       tag: tagMap.get(name_normalized) ?? null,
     });
@@ -216,7 +221,7 @@ export async function getCrossEventExhibitors(
       (chunk) =>
         supabase
           .from("companies")
-          .select("name_normalized, country, employees, industry")
+          .select("name_normalized, country, employees, industry, annual_revenue")
           .in("name_normalized", chunk),
       "getCrossEventExhibitors apollo",
     ),
@@ -297,7 +302,7 @@ export async function getEventExhibitors(
       (chunk) =>
         supabase
           .from("companies")
-          .select("name_normalized, country, employees, industry")
+          .select("name_normalized, country, employees, industry, annual_revenue")
           .in("name_normalized", chunk),
       "getEventExhibitors apollo",
     ),
@@ -420,6 +425,7 @@ export type TaggedCompanyRow = {
   country: string | null;
   employees: number | null;
   industry: string | null;
+  annual_revenue: number | null;
   tag: TagValue;
   updated_at: string;
 };
@@ -506,7 +512,7 @@ export async function listTaggedCompanies(
     (chunk) =>
       supabase
         .from("companies")
-        .select("name_normalized, name, country, employees, industry")
+        .select("name_normalized, name, country, employees, industry, annual_revenue")
         .in("name_normalized", chunk),
     "listTaggedCompanies apollo",
   );
@@ -521,6 +527,7 @@ export async function listTaggedCompanies(
       country: apollo?.country ?? null,
       employees: apollo?.employees ?? null,
       industry: apollo?.industry ?? null,
+      annual_revenue: apollo?.annual_revenue ?? null,
       tag: t.tag,
       updated_at: t.updated_at,
     };

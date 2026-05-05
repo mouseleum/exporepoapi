@@ -1,6 +1,7 @@
 "use client";
 
 import type { LibraryExhibitor, TagValue } from "@/lib/library/queries";
+import { formatRevenueUsd } from "@/lib/library/format";
 import { TagPicker } from "./TagPicker";
 
 type ExhibitorPreviewProps = {
@@ -48,6 +49,7 @@ export function ExhibitorPreview({
               <th>Hall</th>
               <th>Booth</th>
               <th>Employees</th>
+              <th>Revenue</th>
               <th>Industry</th>
               <th>Source</th>
               <th>Tag</th>
@@ -62,6 +64,9 @@ export function ExhibitorPreview({
                 <td className="hall-cell">{row.booth ?? "—"}</td>
                 <td className="country-cell">
                   {formatEmployees(row.employees)}
+                </td>
+                <td className="country-cell">
+                  {formatRevenueUsd(row.annual_revenue) ?? "—"}
                 </td>
                 <td className="industry-cell">{row.industry ?? "—"}</td>
                 <td className="hall-cell">

@@ -18,6 +18,7 @@ const sample: ScoringCacheEntry = {
       score: 91,
       employees: 200,
       industry: "tech",
+      revenue: null,
     },
   ],
   weights: { US: 80 },

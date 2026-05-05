@@ -16,6 +16,7 @@ export type RankedRow = {
   score: number;
   employees: number | null;
   industry: string | null;
+  revenue: string | null;
 };
 
 export type EnrichedCompany =

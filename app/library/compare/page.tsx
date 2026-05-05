@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { TopNav } from "@/components/TopNav";
 import { StatusBox } from "@/components/StatusBox";
 import { FilterBar } from "@/components/library/FilterBar";
+import { formatRevenueUsd } from "@/lib/library/format";
 import { getCrossEventExhibitors } from "@/app/library/actions";
 import type { CrossEventCompany } from "@/lib/library/queries";
 import {
@@ -151,6 +152,7 @@ export default function ComparePage() {
                   <th>Company</th>
                   <th>Country</th>
                   <th>Employees</th>
+                  <th>Revenue</th>
                   <th>Industry</th>
                   <th>Tag</th>
                   <th>Events</th>
@@ -163,6 +165,9 @@ export default function ComparePage() {
                     <td className="country-cell">{r.country || "—"}</td>
                     <td className="country-cell">
                       {formatEmployees(r.employees)}
+                    </td>
+                    <td className="country-cell">
+                      {formatRevenueUsd(r.annual_revenue) ?? "—"}
                     </td>
                     <td className="industry-cell">{r.industry ?? "—"}</td>
                     <td className="hall-cell">

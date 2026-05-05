@@ -104,6 +104,7 @@ export async function runScoringPipeline(
       hall: r.hall,
       employees: e && e.matched ? e.employee_count : null,
       industry: e && e.matched ? e.industry : null,
+      revenue: e && e.matched ? e.revenue_range : null,
     };
   });
   const final = await scoreCompanies(scorable, {

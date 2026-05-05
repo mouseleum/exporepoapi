@@ -17,6 +17,7 @@ export type ScorableCompany = {
   hall?: string | null;
   employees?: number | null;
   industry?: string | null;
+  revenue?: string | null;
 };
 
 export type ScoreOptions = {
@@ -41,14 +42,14 @@ function syntheticEnrichment(
 ): Record<string, EnrichedCompany> {
   const map: Record<string, EnrichedCompany> = {};
   for (const r of rows) {
-    if (r.employees == null && !r.industry) continue;
+    if (r.employees == null && !r.industry && !r.revenue) continue;
     map[key(r.name)] = {
       name: r.name,
       matched: true,
       employee_count: r.employees ?? null,
       employee_range: null,
       industry: r.industry ?? null,
-      revenue_range: null,
+      revenue_range: r.revenue ?? null,
       founded: null,
       linkedin_url: null,
       tags: [],
@@ -103,6 +104,7 @@ export async function scoreCompanies(
     const e = enrichedMap[k];
     const employees = e?.matched ? e.employee_count : null;
     const industry = e?.matched ? e.industry : null;
+    const revenue = e?.matched ? e.revenue_range : null;
     return {
       rank: item.rank,
       name: item.name,
@@ -111,6 +113,7 @@ export async function scoreCompanies(
       score: item.score,
       employees,
       industry,
+      revenue,
     };
   });
 }

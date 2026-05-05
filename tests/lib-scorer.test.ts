@@ -66,6 +66,7 @@ describe("scoreCompanies", () => {
       score: 95,
       employees: 68000,
       industry: "hospital & health care",
+      revenue: null,
     });
     expect(out[1]).toMatchObject({
       rank: 2,

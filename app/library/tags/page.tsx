@@ -16,6 +16,7 @@ import {
   type TagValue,
   type TaggedCompanyRow,
 } from "@/lib/library/queries";
+import { formatRevenueUsd } from "@/lib/library/format";
 import type { Status } from "@/lib/types";
 
 type State = {
@@ -262,6 +263,7 @@ export default function TagsPage() {
                   <th>Company</th>
                   <th>Country</th>
                   <th>Employees</th>
+                  <th>Revenue</th>
                   <th>Industry</th>
                   <th>Tag</th>
                   <th>Updated</th>
@@ -274,6 +276,9 @@ export default function TagsPage() {
                     <td className="country-cell">{r.country ?? "—"}</td>
                     <td className="country-cell">
                       {formatEmployees(r.employees)}
+                    </td>
+                    <td className="country-cell">
+                      {formatRevenueUsd(r.annual_revenue) ?? "—"}
                     </td>
                     <td className="industry-cell">{r.industry ?? "—"}</td>
                     <td>
