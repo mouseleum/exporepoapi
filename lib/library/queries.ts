@@ -340,6 +340,8 @@ export type SaveEventResult = {
   slug: string;
   exhibitor_count: number;
   dupes_skipped: number;
+  companies_added: number;
+  companies_updated: number;
 };
 
 export function dedupeForSave(rows: SaveEventRow[]): {
@@ -411,11 +413,22 @@ export async function saveEventWithExhibitors(
     if (error) throw new Error(`saveEvent event_exhibitors: ${error.message}`);
   }
 
+  const sync = await syncCompaniesToDb(
+    deduped.map((r) => ({
+      name: r.raw_name,
+      country: r.country ?? null,
+    })),
+    meta.slug,
+    supabase,
+  );
+
   return {
     event_id,
     slug: meta.slug,
     exhibitor_count: eeRows.length,
     dupes_skipped: dupes,
+    companies_added: sync.added,
+    companies_updated: sync.updated,
   };
 }
 

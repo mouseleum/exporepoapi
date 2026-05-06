@@ -9,7 +9,6 @@ import {
   apiFetch,
   extractTextFromAnthropic,
 } from "@/lib/api-client";
-import { syncCompaniesToDb } from "@/app/library/actions";
 import { buildPdfExtractPrompt } from "@/lib/prompts";
 import { ExtractedCompaniesSchema } from "@/lib/schemas";
 import { runScoringPipeline } from "@/lib/scoring-pipeline";
@@ -41,7 +40,6 @@ type State = {
   rankedData: RankedRow[];
   status: Status;
   isScoring: boolean;
-  isSaving: boolean;
   isSavingLibrary: boolean;
 };
 
@@ -61,8 +59,6 @@ type Action =
   | { type: "SCORE_START" }
   | { type: "SCORE_SUCCESS"; data: RankedRow[] }
   | { type: "SCORE_END" }
-  | { type: "SAVE_START" }
-  | { type: "SAVE_END" }
   | { type: "SAVE_LIBRARY_START" }
   | { type: "SAVE_LIBRARY_END" };
 
@@ -77,7 +73,6 @@ const initialState: State = {
   rankedData: [],
   status: { kind: "idle" },
   isScoring: false,
-  isSaving: false,
   isSavingLibrary: false,
 };
 
@@ -113,10 +108,6 @@ function reducer(state: State, action: Action): State {
       };
     case "SCORE_END":
       return { ...state, isScoring: false };
-    case "SAVE_START":
-      return { ...state, isSaving: true };
-    case "SAVE_END":
-      return { ...state, isSaving: false };
     case "SAVE_LIBRARY_START":
       return { ...state, isSavingLibrary: true };
     case "SAVE_LIBRARY_END":
@@ -352,61 +343,6 @@ export function RankerTab() {
     }
   };
 
-  const saveToDBOnly = async () => {
-    if (!state.selection.name) {
-      dispatch({
-        type: "STATUS",
-        status: {
-          kind: "error",
-          message: "Please select the company name column.",
-        },
-      });
-      return;
-    }
-    const { name, country } = state.selection;
-    const rows = state.parsedRows
-      .map((r) => ({
-        name: String(r[name] ?? "").trim(),
-        country: country ? String(r[country] ?? "").trim() : null,
-      }))
-      .filter((r) => r.name.length > 1);
-
-    if (!rows.length) {
-      dispatch({
-        type: "STATUS",
-        status: { kind: "error", message: "No valid company names found." },
-      });
-      return;
-    }
-
-    dispatch({ type: "SAVE_START" });
-    dispatch({
-      type: "STATUS",
-      status: {
-        kind: "loading",
-        message: `Saving ${rows.length} companies to database...`,
-      },
-    });
-    try {
-      const result = await syncCompaniesToDb(rows, sourceName());
-      dispatch({
-        type: "STATUS",
-        status: {
-          kind: "info",
-          message: `✓ Saved to database — ${result.added} new, ${result.updated} updated (${result.total} total)`,
-        },
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      dispatch({
-        type: "STATUS",
-        status: { kind: "error", message: "DB sync error: " + message },
-      });
-    } finally {
-      dispatch({ type: "SAVE_END" });
-    }
-  };
-
   const saveToLibrary = async (meta: {
     name: string;
     slug: string;
@@ -462,11 +398,15 @@ export function RankerTab() {
         result.dupes_skipped > 0
           ? ` (${result.dupes_skipped} duplicates skipped)`
           : "";
+      const dbNote =
+        result.companies_added + result.companies_updated > 0
+          ? ` · DB: +${result.companies_added} new, ${result.companies_updated} updated`
+          : "";
       dispatch({
         type: "STATUS",
         status: {
           kind: "info",
-          message: `✓ Saved to Library — ${result.exhibitor_count} exhibitors under "${result.slug}"${dupNote}`,
+          message: `✓ Saved to Library — ${result.exhibitor_count} exhibitors under "${result.slug}"${dupNote}${dbNote}`,
         },
       });
     } catch (err) {
@@ -530,11 +470,10 @@ export function RankerTab() {
           />
           <ActionButtons
             isScoring={state.isScoring}
-            isSaving={state.isSaving}
             onScore={runScoring}
-            onSave={saveToDBOnly}
           />
           <SaveToLibrary
+            key={state.fileName}
             defaultName={sourceName()}
             isSaving={state.isSavingLibrary}
             onSave={saveToLibrary}
