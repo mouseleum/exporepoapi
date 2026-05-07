@@ -3,16 +3,18 @@
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { DimedisConfigSchema } from "@/lib/adapters/dimedis";
+import { MapYourShowConfigSchema } from "@/lib/adapters/mapyourshow";
 import type { CreateEventInput } from "@/lib/library/admin-queries";
 
-type Family = "dimedis" | "cyberseceurope";
+type Family = "dimedis" | "cyberseceurope" | "mapyourshow";
 
 const FAMILY_LABELS: Record<Family, string> = {
   dimedis: "DIMEDIS Vis (interpack, drupa, medica, glasstec, boot, …)",
   cyberseceurope: "Cybersec Europe (static HTML)",
+  mapyourshow: "MapYourShow (Battery Show, NAB, IBC, …)",
 };
 
-const FAMILIES: Family[] = ["dimedis", "cyberseceurope"];
+const FAMILIES: Family[] = ["dimedis", "cyberseceurope", "mapyourshow"];
 
 function slugify(name: string, year: number | null): string {
   const base = name
@@ -73,7 +75,7 @@ export function EventAddForm({ onCreate, busy }: Props) {
     if (family === "cyberseceurope") return {};
     const cfg: Record<string, unknown> = {};
     if (domain.trim()) cfg.domain = domain.trim();
-    if (lang.trim()) cfg.lang = lang.trim();
+    if (family === "dimedis" && lang.trim()) cfg.lang = lang.trim();
     if (minExhibitors.trim() !== "") {
       const n = Number(minExhibitors);
       if (Number.isInteger(n) && n >= 0) cfg.minExhibitors = n;
@@ -89,8 +91,14 @@ export function EventAddForm({ onCreate, busy }: Props) {
     if (!sourceUrl.trim()) return setFormError("Source URL is required.");
 
     const adapterConfig = buildAdapterConfig();
-    if (family === "dimedis") {
-      const parsed = DimedisConfigSchema.safeParse(adapterConfig);
+    const schema =
+      family === "dimedis"
+        ? DimedisConfigSchema
+        : family === "mapyourshow"
+          ? MapYourShowConfigSchema
+          : null;
+    if (schema) {
+      const parsed = schema.safeParse(adapterConfig);
       if (!parsed.success) {
         return setFormError(
           parsed.error.issues
@@ -183,36 +191,46 @@ export function EventAddForm({ onCreate, busy }: Props) {
             placeholder={
               family === "cyberseceurope"
                 ? "https://www.cyberseceurope.com/visit/exhibitor-list"
-                : "https://www.example.com/vis/v1/en/directory/a"
+                : family === "mapyourshow"
+                  ? "https://tbse26.mapyourshow.com/8_0/explore/exhibitor-gallery.cfm?featured=false"
+                  : "https://www.example.com/vis/v1/en/directory/a"
             }
             disabled={busy}
             required
           />
         </label>
 
-        {family === "dimedis" && (
+        {(family === "dimedis" || family === "mapyourshow") && (
           <>
             <label className="event-add-field">
-              <span>Domain (X-Vis-Domain)</span>
+              <span>
+                Domain {family === "dimedis" ? "(X-Vis-Domain)" : "(host)"}
+              </span>
               <input
                 type="text"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="www.drupa.com"
+                placeholder={
+                  family === "dimedis"
+                    ? "www.drupa.com"
+                    : "tbse26.mapyourshow.com"
+                }
                 disabled={busy}
                 required
               />
             </label>
-            <label className="event-add-field">
-              <span>Lang (optional)</span>
-              <input
-                type="text"
-                value={lang}
-                onChange={(e) => setLang(e.target.value)}
-                placeholder="en"
-                disabled={busy}
-              />
-            </label>
+            {family === "dimedis" && (
+              <label className="event-add-field">
+                <span>Lang (optional)</span>
+                <input
+                  type="text"
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value)}
+                  placeholder="en"
+                  disabled={busy}
+                />
+              </label>
+            )}
             <label className="event-add-field">
               <span>Min exhibitors (optional)</span>
               <input
