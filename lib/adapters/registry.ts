@@ -1,20 +1,16 @@
-import type { Adapter } from "./types";
-import { cyberseceuropeAdapter } from "./cyberseceurope";
-import { interpackAdapter } from "./interpack";
-import { drupaAdapter } from "./drupa";
-import { medicaAdapter } from "./medica";
-import { glasstecAdapter } from "./glasstec";
-import { bootAdapter } from "./boot";
+import type { AdapterFactory } from "./types";
+import { dimedisFactory } from "./dimedis";
+import { cyberseceuropeFactory } from "./cyberseceurope";
 
-export const ADAPTERS: Record<string, Adapter> = {
-  cyberseceurope: cyberseceuropeAdapter,
-  interpack: interpackAdapter,
-  drupa: drupaAdapter,
-  medica: medicaAdapter,
-  glasstec: glasstecAdapter,
-  boot: bootAdapter,
+export const ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
+  dimedis: dimedisFactory,
+  cyberseceurope: cyberseceuropeFactory,
 };
 
-export function getAdapter(key: string): Adapter | undefined {
-  return ADAPTERS[key];
+export function getAdapterFactory(family: string): AdapterFactory | undefined {
+  return ADAPTER_FACTORIES[family];
+}
+
+export function adapterFamilies(): string[] {
+  return Object.keys(ADAPTER_FACTORIES);
 }

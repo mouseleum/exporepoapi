@@ -1,15 +1,6 @@
 import type { Adapter, EventMeta, RawExhibitor } from "./types";
 
-const SOURCE_URL = "https://www.cyberseceurope.com/visit/exhibitor-list";
 const MIN_EXHIBITORS = 50;
-
-const meta: EventMeta = {
-  source: "cyberseceurope",
-  slug: "cyberseceurope-2026",
-  name: "Cybersec Europe 2026",
-  year: 2026,
-  source_url: SOURCE_URL,
-};
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -56,28 +47,26 @@ export function parse(html: string): RawExhibitor[] {
   return out;
 }
 
-export async function fetchExhibitors(): Promise<RawExhibitor[]> {
-  const res = await fetch(SOURCE_URL, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml",
-    },
-  });
-  if (!res.ok) {
-    throw new Error(`cyberseceurope fetch failed: ${res.status}`);
+export function cyberseceuropeFactory(meta: EventMeta, _config: unknown): Adapter {
+  async function fetchExhibitors(): Promise<RawExhibitor[]> {
+    const res = await fetch(meta.source_url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml",
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`cyberseceurope fetch failed: ${res.status}`);
+    }
+    const html = await res.text();
+    const exhibitors = parse(html);
+    if (exhibitors.length < MIN_EXHIBITORS) {
+      throw new Error(
+        `cyberseceurope parse yielded ${exhibitors.length} exhibitors (expected >= ${MIN_EXHIBITORS}); page layout may have changed`,
+      );
+    }
+    return exhibitors;
   }
-  const html = await res.text();
-  const exhibitors = parse(html);
-  if (exhibitors.length < MIN_EXHIBITORS) {
-    throw new Error(
-      `cyberseceurope parse yielded ${exhibitors.length} exhibitors (expected >= ${MIN_EXHIBITORS}); page layout may have changed`,
-    );
-  }
-  return exhibitors;
+  return { meta, fetch: fetchExhibitors };
 }
-
-export const cyberseceuropeAdapter: Adapter = {
-  meta,
-  fetch: fetchExhibitors,
-};

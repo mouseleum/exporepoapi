@@ -17,3 +17,5 @@ export type Adapter = {
   meta: EventMeta;
   fetch: () => Promise<RawExhibitor[]>;
 };
+
+export type AdapterFactory = (meta: EventMeta, config: unknown) => Adapter;

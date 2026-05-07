@@ -2,28 +2,39 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ path: ".env.local" });
 loadEnv();
 import { createServiceClient } from "../lib/supabase";
-import { ADAPTERS } from "../lib/adapters/registry";
-import { loadEventForAdapter } from "../lib/library/load-event";
+import { adapterFamilies } from "../lib/adapters/registry";
+import { loadEventForRow, type EventRow } from "../lib/library/load-event";
 
 async function main(): Promise<void> {
   const slug = process.argv[2];
   if (!slug) {
     console.error(
-      `Usage: pnpm load:event <adapter>\nKnown adapters: ${Object.keys(ADAPTERS).join(", ")}`,
-    );
-    process.exit(1);
-  }
-  const adapter = ADAPTERS[slug];
-  if (!adapter) {
-    console.error(
-      `Unknown adapter: ${slug}\nKnown adapters: ${Object.keys(ADAPTERS).join(", ")}`,
+      `Usage: pnpm load:event <event-slug>\nKnown adapter families: ${adapterFamilies().join(", ")}`,
     );
     process.exit(1);
   }
 
   const supabase = createServiceClient();
-  console.log(`Fetching exhibitors from ${adapter.meta.source_url}...`);
-  const result = await loadEventForAdapter(adapter, supabase);
+  const { data, error } = await supabase
+    .from("events")
+    .select("source, slug, name, year, source_url, adapter_config")
+    .eq("slug", slug)
+    .single();
+  if (error || !data) {
+    console.error(`event not found: ${slug} (${error?.message ?? "no row"})`);
+    process.exit(1);
+  }
+  const row = data as EventRow;
+
+  if (!adapterFamilies().includes(row.source)) {
+    console.error(
+      `event ${slug} has source='${row.source}' which has no adapter family registered. Known families: ${adapterFamilies().join(", ")}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`Fetching exhibitors for ${slug} via ${row.source} family...`);
+  const result = await loadEventForRow(row, supabase);
   if (result.dupes > 0) {
     console.log(`Skipped ${result.dupes} duplicate name_normalized rows.`);
   }

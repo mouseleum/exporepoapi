@@ -1,14 +1,12 @@
+import { z } from "zod";
 import type { Adapter, EventMeta, RawExhibitor } from "./types";
 
-export type DimedisConfig = {
-  domain: string;
-  source: string;
-  slug: string;
-  name: string;
-  year: number | null;
-  lang?: string;
-  minExhibitors?: number;
-};
+export const DimedisConfigSchema = z.object({
+  domain: z.string().min(1),
+  lang: z.string().min(1).optional(),
+  minExhibitors: z.number().int().nonnegative().optional(),
+});
+export type DimedisConfig = z.infer<typeof DimedisConfigSchema>;
 
 export type DirectoryMeta = {
   links: Array<{ link: string; label: string; isFilled: boolean }>;
@@ -56,23 +54,15 @@ export function parseLetter(entries: DirectoryEntry[]): RawExhibitor[] {
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-export function createDimedisAdapter(config: DimedisConfig): Adapter {
-  const lang = config.lang ?? "en";
-  const apiHost = `https://${config.domain}`;
+export function dimedisFactory(meta: EventMeta, config: unknown): Adapter {
+  const parsed = DimedisConfigSchema.parse(config);
+  const lang = parsed.lang ?? "en";
+  const apiHost = `https://${parsed.domain}`;
   const apiBase = `${apiHost}/vis-api/vis/v1/${lang}`;
-  const sourceUrl = `${apiHost}/vis/v1/${lang}/directory/a`;
-  const minExhibitors = config.minExhibitors ?? 50;
-
-  const meta: EventMeta = {
-    source: config.source,
-    slug: config.slug,
-    name: config.name,
-    year: config.year,
-    source_url: sourceUrl,
-  };
+  const minExhibitors = parsed.minExhibitors ?? 50;
 
   const headers = {
-    "X-Vis-Domain": config.domain,
+    "X-Vis-Domain": parsed.domain,
     Accept: "application/json",
     "User-Agent": USER_AGENT,
   } as const;
@@ -80,7 +70,7 @@ export function createDimedisAdapter(config: DimedisConfig): Adapter {
   async function fetchJson<T>(url: string): Promise<T> {
     const res = await fetch(url, { headers });
     if (!res.ok) {
-      throw new Error(`${config.source} fetch ${url} failed: ${res.status}`);
+      throw new Error(`${meta.source} fetch ${url} failed: ${res.status}`);
     }
     return (await res.json()) as T;
   }
@@ -103,7 +93,7 @@ export function createDimedisAdapter(config: DimedisConfig): Adapter {
     }
     if (out.length < minExhibitors) {
       throw new Error(
-        `${config.source} fetch yielded ${out.length} exhibitors (expected >= ${minExhibitors}); API shape may have changed`,
+        `${meta.source} fetch yielded ${out.length} exhibitors (expected >= ${minExhibitors}); API shape may have changed`,
       );
     }
     return out;

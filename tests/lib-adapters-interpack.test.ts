@@ -2,12 +2,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  interpackAdapter,
+  dimedisFactory,
   parseLetter,
   parseLocation,
   type DirectoryEntry,
   type DirectoryMeta,
-} from "../lib/adapters/interpack";
+} from "../lib/adapters/dimedis";
+import type { EventMeta } from "../lib/adapters/types";
 
 const letterA = JSON.parse(
   readFileSync(join(__dirname, "fixtures/interpack-letter-a.json"), "utf8"),
@@ -17,31 +18,31 @@ const dirMeta = JSON.parse(
   readFileSync(join(__dirname, "fixtures/interpack-meta.json"), "utf8"),
 ) as DirectoryMeta;
 
+const META: EventMeta = {
+  source: "dimedis",
+  slug: "interpack-2026",
+  name: "interpack 2026",
+  year: 2026,
+  source_url: "https://www.interpack.com/vis/v1/en/directory/a",
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-describe("interpack adapter — parseLocation()", () => {
-  it("splits 'Hall 15 / D42' into hall=15 booth=D42", () => {
-    expect(parseLocation("Hall 15 / D42")).toEqual({
-      hall: "15",
-      booth: "D42",
-    });
+describe("dimedis @ interpack — parseLocation", () => {
+  it("splits 'Hall 15 / D42'", () => {
+    expect(parseLocation("Hall 15 / D42")).toEqual({ hall: "15", booth: "D42" });
   });
 
   it("preserves alphanumeric hall numbers like '8a'", () => {
-    expect(parseLocation("Hall 8a / C12")).toEqual({
-      hall: "8a",
-      booth: "C12",
-    });
+    expect(parseLocation("Hall 8a / C12")).toEqual({ hall: "8a", booth: "C12" });
   });
 
   it("returns null/null for empty or whitespace input", () => {
     expect(parseLocation("")).toEqual({ hall: null, booth: null });
     expect(parseLocation("   ")).toEqual({ hall: null, booth: null });
-    expect(parseLocation(null)).toEqual({ hall: null, booth: null });
-    expect(parseLocation(undefined)).toEqual({ hall: null, booth: null });
   });
 
   it("falls back to hall=raw when the pattern doesn't match", () => {
@@ -49,7 +50,7 @@ describe("interpack adapter — parseLocation()", () => {
   });
 });
 
-describe("interpack adapter — parseLetter()", () => {
+describe("dimedis @ interpack — parseLetter against real fixture", () => {
   it("emits one row per profile entry, in input order", () => {
     const result = parseLetter(letterA);
     expect(result.map((r) => r.raw_name)).toEqual([
@@ -60,7 +61,7 @@ describe("interpack adapter — parseLetter()", () => {
     ]);
   });
 
-  it("filters out trademark entries (parent profile is already in the list)", () => {
+  it("filters out trademark entries", () => {
     const names = parseLetter(letterA).map((r) => r.raw_name);
     expect(names).not.toContain("AK RAMON");
   });
@@ -74,24 +75,9 @@ describe("interpack adapter — parseLetter()", () => {
       booth: "D42",
     });
   });
-
-  it("emits null country/hall/booth for entries with empty fields", () => {
-    const result = parseLetter(letterA);
-    const noBooth = result.find((r) => r.raw_name === "No Booth Yet GmbH");
-    expect(noBooth).toEqual({
-      raw_name: "No Booth Yet GmbH",
-      country: "Germany",
-      hall: null,
-      booth: null,
-    });
-  });
-
-  it("returns [] for empty input", () => {
-    expect(parseLetter([])).toEqual([]);
-  });
 });
 
-describe("interpack adapter — fetch()", () => {
+describe("dimedis @ interpack — fetch against real fixture", () => {
   function stubFetch(handler: (url: string) => unknown) {
     const fn = vi.fn(async (url: string, _init?: RequestInit) => ({
       ok: true,
@@ -105,7 +91,6 @@ describe("interpack adapter — fetch()", () => {
   it("walks meta links, fetches each filled letter, and merges results", async () => {
     const fn = stubFetch((url) => {
       if (url.endsWith("/directory/meta")) return dirMeta;
-      // give every requested letter the same fixture so the count crosses 1000
       return Array.from({ length: 400 }, (_, i) => ({
         ...letterA[0],
         id: `profile=fake.${url.slice(-3)}.${i}`,
@@ -113,7 +98,11 @@ describe("interpack adapter — fetch()", () => {
       }));
     });
 
-    const out = await interpackAdapter.fetch();
+    const adapter = dimedisFactory(META, {
+      domain: "www.interpack.com",
+      minExhibitors: 1000,
+    });
+    const out = await adapter.fetch();
     expect(out.length).toBeGreaterThanOrEqual(1000);
     const calledUrls = fn.mock.calls.map((c) => c[0]);
     expect(calledUrls[0]).toContain("/directory/meta");
@@ -132,16 +121,6 @@ describe("interpack adapter — fetch()", () => {
     }
   });
 
-  it("dedupes by lowercased name across letters", async () => {
-    stubFetch((url) => {
-      if (url.endsWith("/directory/meta")) return dirMeta;
-      return [letterA[0]]; // same single profile in every letter
-    });
-    await expect(interpackAdapter.fetch()).rejects.toThrow(
-      /API shape may have changed/,
-    );
-  });
-
   it("throws when a letter request fails", async () => {
     vi.stubGlobal(
       "fetch",
@@ -151,19 +130,10 @@ describe("interpack adapter — fetch()", () => {
         return { ok: false, status: 503, json: async () => ({}) };
       }),
     );
-    await expect(interpackAdapter.fetch()).rejects.toThrow(
-      /interpack fetch .* failed: 503/,
-    );
-  });
-});
-
-describe("interpack adapter — meta", () => {
-  it("declares slug, source, and source_url", () => {
-    expect(interpackAdapter.meta).toMatchObject({
-      source: "interpack",
-      slug: "interpack-2026",
-      year: 2026,
+    const adapter = dimedisFactory(META, {
+      domain: "www.interpack.com",
+      minExhibitors: 1000,
     });
-    expect(interpackAdapter.meta.source_url).toMatch(/interpack\.com/);
+    await expect(adapter.fetch()).rejects.toThrow(/dimedis fetch .* failed: 503/);
   });
 });

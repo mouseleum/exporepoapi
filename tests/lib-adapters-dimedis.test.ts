@@ -1,16 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  createDimedisAdapter,
+  dimedisFactory,
   parseLetter,
   parseLocation,
   type DirectoryEntry,
   type DirectoryMeta,
 } from "../lib/adapters/dimedis";
+import type { EventMeta } from "../lib/adapters/types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+const META: EventMeta = {
+  source: "dimedis",
+  slug: "example-2027",
+  name: "Example 2027",
+  year: 2027,
+  source_url: "https://www.example.de/vis/v1/en/directory/a",
+};
 
 describe("dimedis — parseLocation", () => {
   it("splits 'Hall 8a / C12'", () => {
@@ -41,7 +50,7 @@ describe("dimedis — parseLetter", () => {
   });
 });
 
-describe("dimedis — createDimedisAdapter", () => {
+describe("dimedis — dimedisFactory", () => {
   function stubFetch(handler: (url: string) => unknown) {
     const fn = vi.fn(async (_url: string, _init?: RequestInit) => ({
       ok: true,
@@ -71,12 +80,8 @@ describe("dimedis — createDimedisAdapter", () => {
       }));
     });
 
-    const adapter = createDimedisAdapter({
+    const adapter = dimedisFactory(META, {
       domain: "www.example.de",
-      source: "example",
-      slug: "example-2027",
-      name: "Example 2027",
-      year: 2027,
       minExhibitors: 10,
     });
     const out = await adapter.fetch();
@@ -99,12 +104,8 @@ describe("dimedis — createDimedisAdapter", () => {
         { id: "p", type: "profile", name: `${url.slice(-1)}-Co`, country: "" },
       ];
     });
-    const adapter = createDimedisAdapter({
+    const adapter = dimedisFactory(META, {
       domain: "www.example.de",
-      source: "example",
-      slug: "example-2027",
-      name: "Example",
-      year: 2027,
       minExhibitors: 1,
     });
     await adapter.fetch();
@@ -114,16 +115,11 @@ describe("dimedis — createDimedisAdapter", () => {
 
   it("respects the configured language", async () => {
     const fn = stubFetch(() => dirMeta);
-    const adapter = createDimedisAdapter({
+    const adapter = dimedisFactory(META, {
       domain: "www.example.de",
-      source: "example",
-      slug: "example",
-      name: "Example",
-      year: null,
       lang: "de",
       minExhibitors: 0,
     });
-    // expect it to throw because no profiles, but URL should still hit /de/
     await expect(adapter.fetch()).rejects.toThrow();
     const firstUrl = fn.mock.calls[0]?.[0];
     expect(firstUrl).toContain("/vis-api/vis/v1/de/");
@@ -134,12 +130,8 @@ describe("dimedis — createDimedisAdapter", () => {
       if (url.endsWith("/directory/meta")) return dirMeta;
       return [{ id: "p", type: "profile", name: `${url.slice(-1)}-Co` }];
     });
-    const adapter = createDimedisAdapter({
+    const adapter = dimedisFactory(META, {
       domain: "www.example.de",
-      source: "example",
-      slug: "example",
-      name: "Example",
-      year: null,
       minExhibitors: 100,
     });
     await expect(adapter.fetch()).rejects.toThrow(/API shape may have changed/);
@@ -150,30 +142,28 @@ describe("dimedis — createDimedisAdapter", () => {
       if (url.endsWith("/directory/meta")) return dirMeta;
       return [{ id: "p", type: "profile", name: "Same Co", country: "DE" }];
     });
-    const adapter = createDimedisAdapter({
+    const adapter = dimedisFactory(META, {
       domain: "www.example.de",
-      source: "example",
-      slug: "example",
-      name: "Example",
-      year: null,
       minExhibitors: 1,
     });
     const out = await adapter.fetch();
     expect(out.map((r) => r.raw_name)).toEqual(["Same Co"]);
   });
 
-  it("error messages include the source name", async () => {
+  it("error messages include the source name from meta", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ ok: false, status: 503, json: async () => ({}) })),
     );
-    const adapter = createDimedisAdapter({
-      domain: "www.example.de",
-      source: "myshow",
-      slug: "myshow",
-      name: "My Show",
-      year: null,
-    });
+    const adapter = dimedisFactory(
+      { ...META, source: "myshow" },
+      { domain: "www.example.de" },
+    );
     await expect(adapter.fetch()).rejects.toThrow(/myshow fetch .* failed: 503/);
+  });
+
+  it("rejects an invalid config blob via Zod", () => {
+    expect(() => dimedisFactory(META, { lang: "en" })).toThrow();
+    expect(() => dimedisFactory(META, { domain: "" })).toThrow();
   });
 });

@@ -1,15 +1,21 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  cyberseceuropeAdapter,
-  parse,
-} from "../lib/adapters/cyberseceurope";
+import { cyberseceuropeFactory, parse } from "../lib/adapters/cyberseceurope";
+import type { EventMeta } from "../lib/adapters/types";
 
 const fixture = readFileSync(
   join(__dirname, "fixtures/cyberseceurope.html"),
   "utf8",
 );
+
+const META: EventMeta = {
+  source: "cyberseceurope",
+  slug: "cyberseceurope-2026",
+  name: "Cybersec Europe 2026",
+  year: 2026,
+  source_url: "https://www.cyberseceurope.com/visit/exhibitor-list",
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -80,18 +86,19 @@ describe("cyberseceurope adapter — parse()", () => {
 });
 
 describe("cyberseceurope adapter — fetch()", () => {
-  it("fetches the live URL, parses, and returns exhibitors", async () => {
+  it("fetches the meta source_url, parses, and returns exhibitors", async () => {
     const fn = vi.fn(async () => ({
       ok: true,
       status: 200,
       text: async () => fixture.repeat(8),
     }));
     vi.stubGlobal("fetch", fn);
-    const out = await cyberseceuropeAdapter.fetch();
+    const adapter = cyberseceuropeFactory(META, {});
+    const out = await adapter.fetch();
     expect(out.length).toBeGreaterThanOrEqual(50);
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith(
-      "https://www.cyberseceurope.com/visit/exhibitor-list",
+      META.source_url,
       expect.objectContaining({ headers: expect.anything() }),
     );
   });
@@ -101,7 +108,8 @@ describe("cyberseceurope adapter — fetch()", () => {
       "fetch",
       vi.fn(async () => ({ ok: false, status: 503, text: async () => "" })),
     );
-    await expect(cyberseceuropeAdapter.fetch()).rejects.toThrow(
+    const adapter = cyberseceuropeFactory(META, {});
+    await expect(adapter.fetch()).rejects.toThrow(
       /cyberseceurope fetch failed: 503/,
     );
   });
@@ -115,19 +123,19 @@ describe("cyberseceurope adapter — fetch()", () => {
         text: async () => "<html><body><p>nothing here</p></body></html>",
       })),
     );
-    await expect(cyberseceuropeAdapter.fetch()).rejects.toThrow(
-      /page layout may have changed/,
-    );
+    const adapter = cyberseceuropeFactory(META, {});
+    await expect(adapter.fetch()).rejects.toThrow(/page layout may have changed/);
   });
 });
 
-describe("cyberseceurope adapter — meta", () => {
-  it("declares slug, source, and source_url", () => {
-    expect(cyberseceuropeAdapter.meta).toMatchObject({
-      source: "cyberseceurope",
-      slug: "cyberseceurope-2026",
-      year: 2026,
-      source_url: "https://www.cyberseceurope.com/visit/exhibitor-list",
-    });
+describe("cyberseceurope adapter — meta passthrough", () => {
+  it("the factory returns an Adapter whose meta is the input meta", () => {
+    const adapter = cyberseceuropeFactory(META, {});
+    expect(adapter.meta).toEqual(META);
+  });
+
+  it("ignores its config argument", () => {
+    const adapter = cyberseceuropeFactory(META, { ignored: "yes" });
+    expect(adapter.meta).toEqual(META);
   });
 });

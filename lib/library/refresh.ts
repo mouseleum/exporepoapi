@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Adapter } from "../adapters/types";
-import { ADAPTERS } from "../adapters/registry";
-import { loadEventForAdapter, type LoadEventResult } from "./load-event";
+import type { AdapterFactory } from "../adapters/types";
+import { ADAPTER_FACTORIES } from "../adapters/registry";
+import {
+  loadEventForRow,
+  type EventRow,
+  type LoadEventResult,
+} from "./load-event";
 
 export type RefreshOutcome =
   | ({ status: "ok" } & LoadEventResult)
@@ -18,24 +22,22 @@ export type RefreshSummary = {
   results: RefreshOutcome[];
 };
 
-export type DbEvent = { slug: string; source: string };
-
 export async function listRefreshableEvents(
   supabase: SupabaseClient,
-): Promise<DbEvent[]> {
+): Promise<EventRow[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("slug, source")
+    .select("source, slug, name, year, source_url, adapter_config")
     .order("slug");
   if (error) {
     throw new Error(`events select failed: ${error.message}`);
   }
-  return (data ?? []) as DbEvent[];
+  return (data ?? []) as EventRow[];
 }
 
 export async function refreshAllEvents(
   supabase: SupabaseClient,
-  adapters: Record<string, Adapter> = ADAPTERS,
+  factories: Record<string, AdapterFactory> = ADAPTER_FACTORIES,
 ): Promise<RefreshSummary> {
   const start = Date.now();
   const startedAt = new Date(start).toISOString();
@@ -47,19 +49,18 @@ export async function refreshAllEvents(
   let errors = 0;
 
   for (const ev of events) {
-    const adapter = adapters[ev.source];
-    if (!adapter) {
+    if (!factories[ev.source]) {
       results.push({
         status: "skipped",
         slug: ev.slug,
         source: ev.source,
-        reason: "no adapter registered for source",
+        reason: "no adapter family registered",
       });
       skipped++;
       continue;
     }
     try {
-      const r = await loadEventForAdapter(adapter, supabase);
+      const r = await loadEventForRow(ev, supabase, factories);
       results.push({ status: "ok", ...r });
       ok++;
     } catch (err) {

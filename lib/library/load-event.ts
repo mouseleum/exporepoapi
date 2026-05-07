@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Adapter } from "../adapters/types";
+import type { Adapter, AdapterFactory, EventMeta } from "../adapters/types";
+import { ADAPTER_FACTORIES } from "../adapters/registry";
 import { normalizeName } from "../normalize";
 
 const BATCH_SIZE = 500;
@@ -11,6 +12,47 @@ export type LoadEventResult = {
   dupes: number;
   elapsed_ms: number;
 };
+
+export type EventRow = {
+  source: string;
+  slug: string;
+  name: string;
+  year: number | null;
+  source_url: string | null;
+  adapter_config: unknown;
+};
+
+function rowToMeta(row: EventRow): EventMeta {
+  return {
+    source: row.source,
+    slug: row.slug,
+    name: row.name,
+    year: row.year,
+    source_url: row.source_url ?? "",
+  };
+}
+
+export function buildAdapterForRow(
+  row: EventRow,
+  factories: Record<string, AdapterFactory> = ADAPTER_FACTORIES,
+): Adapter {
+  const factory = factories[row.source];
+  if (!factory) {
+    throw new Error(
+      `no adapter family registered for source '${row.source}' (slug=${row.slug})`,
+    );
+  }
+  return factory(rowToMeta(row), row.adapter_config ?? {});
+}
+
+export async function loadEventForRow(
+  row: EventRow,
+  supabase: SupabaseClient,
+  factories: Record<string, AdapterFactory> = ADAPTER_FACTORIES,
+): Promise<LoadEventResult> {
+  const adapter = buildAdapterForRow(row, factories);
+  return loadEventForAdapter(adapter, supabase);
+}
 
 export async function loadEventForAdapter(
   adapter: Adapter,
