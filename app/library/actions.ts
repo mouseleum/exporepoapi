@@ -32,8 +32,10 @@ export async function getEventExhibitors(
   return _getEventExhibitors(eventId);
 }
 
-export async function getCrossEventExhibitors(): Promise<CrossEventCompany[]> {
-  return _getCrossEventExhibitors();
+export async function getCrossEventExhibitors(
+  opts: { romifyOnly?: boolean } = {},
+): Promise<CrossEventCompany[]> {
+  return _getCrossEventExhibitors(opts);
 }
 
 export async function setCompanyTag(

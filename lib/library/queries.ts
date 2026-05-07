@@ -9,6 +9,7 @@ export type EventListItem = {
   year: number | null;
   scraped_at: string | null;
   exhibitor_count: number;
+  romify_attending: boolean;
 };
 
 export const TAG_VALUES = ["customer", "prospect", "won", "lost"] as const;
@@ -192,8 +193,19 @@ export function groupCrossEventCompanies(
 }
 
 export async function getCrossEventExhibitors(
+  opts: { romifyOnly?: boolean } = {},
   supabase: SupabaseClient = createServiceClient(),
 ): Promise<CrossEventCompany[]> {
+  let eventsQuery = supabase.from("events").select("id, slug, name, year");
+  if (opts.romifyOnly) {
+    eventsQuery = eventsQuery.eq("romify_attending", true);
+  }
+  const { data: events, error: evErr } = await eventsQuery;
+  if (evErr) throw new Error(`getCrossEventExhibitors events: ${evErr.message}`);
+  const eventList = (events as EventRef[] | null) ?? [];
+  if (eventList.length === 0) return [];
+  const allowedEventIds = new Set(eventList.map((e) => e.id));
+
   const ees: EeWithEvent[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await supabase
@@ -202,15 +214,12 @@ export async function getCrossEventExhibitors(
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(`getCrossEventExhibitors ee: ${error.message}`);
     if (!data || data.length === 0) break;
-    ees.push(...(data as EeWithEvent[]));
+    for (const row of data as EeWithEvent[]) {
+      if (allowedEventIds.has(row.event_id)) ees.push(row);
+    }
     if (data.length < PAGE_SIZE) break;
   }
   if (ees.length === 0) return [];
-
-  const { data: events, error: evErr } = await supabase
-    .from("events")
-    .select("id, slug, name, year");
-  if (evErr) throw new Error(`getCrossEventExhibitors events: ${evErr.message}`);
 
   const normalized = Array.from(
     new Set(ees.map((r) => r.name_normalized as string)),
@@ -236,12 +245,7 @@ export async function getCrossEventExhibitors(
     ),
   ]);
 
-  return groupCrossEventCompanies(
-    ees as EeWithEvent[],
-    (events as EventRef[] | null) ?? [],
-    apollos,
-    tags,
-  );
+  return groupCrossEventCompanies(ees, eventList, apollos, tags);
 }
 
 export async function listEvents(
@@ -249,7 +253,7 @@ export async function listEvents(
 ): Promise<EventListItem[]> {
   const { data: events, error } = await supabase
     .from("events")
-    .select("id, slug, name, year, scraped_at")
+    .select("id, slug, name, year, scraped_at, romify_attending")
     .order("year", { ascending: false })
     .order("name", { ascending: true });
   if (error) throw new Error(`listEvents: ${error.message}`);
@@ -273,6 +277,7 @@ export async function listEvents(
     year: (e.year as number | null) ?? null,
     scraped_at: (e.scraped_at as string | null) ?? null,
     exhibitor_count: countMap.get(e.id as string) ?? 0,
+    romify_attending: !!(e.romify_attending as boolean | null),
   }));
 }
 

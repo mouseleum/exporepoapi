@@ -17,17 +17,20 @@ import type { Status } from "@/lib/types";
 
 type State = {
   rows: CrossEventCompany[];
+  showAllEvents: boolean;
   filter: FilterState;
   status: Status;
 };
 
 type Action =
   | { type: "ROWS_LOADED"; rows: CrossEventCompany[] }
+  | { type: "SHOW_ALL_CHANGED"; showAll: boolean }
   | { type: "FILTER_CHANGED"; filter: FilterState }
   | { type: "STATUS"; status: Status };
 
 const initialState: State = {
   rows: [],
+  showAllEvents: false,
   filter: { tag: "all", search: "" },
   status: { kind: "idle" },
 };
@@ -36,6 +39,8 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "ROWS_LOADED":
       return { ...state, rows: action.rows, status: { kind: "idle" } };
+    case "SHOW_ALL_CHANGED":
+      return { ...state, showAllEvents: action.showAll, rows: [] };
     case "FILTER_CHANGED":
       return { ...state, filter: action.filter };
     case "STATUS":
@@ -61,7 +66,7 @@ export default function ComparePage() {
       type: "STATUS",
       status: { kind: "loading", message: "Loading cross-event data…" },
     });
-    getCrossEventExhibitors()
+    getCrossEventExhibitors({ romifyOnly: !state.showAllEvents })
       .then((rows) => {
         if (cancelled) return;
         dispatch({ type: "ROWS_LOADED", rows });
@@ -77,7 +82,7 @@ export default function ComparePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [state.showAllEvents]);
 
   const { rows } = state;
 
@@ -121,6 +126,19 @@ export default function ComparePage() {
           Exhibitors that appear at two or more events in the database. Apollo
           enrichment is merged in where available.
         </p>
+      </div>
+
+      <div className="event-picker">
+        <label className="event-picker-toggle">
+          <input
+            type="checkbox"
+            checked={state.showAllEvents}
+            onChange={(e) =>
+              dispatch({ type: "SHOW_ALL_CHANGED", showAll: e.target.checked })
+            }
+          />
+          <span>Show all events (not just Romify-attending)</span>
+        </label>
       </div>
 
       <StatusBox status={state.status} />

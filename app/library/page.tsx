@@ -42,6 +42,7 @@ import type {
 
 type State = {
   events: EventListItem[];
+  showAllEvents: boolean;
   selectedId: string | null;
   exhibitors: LibraryExhibitor[];
   filter: FilterState;
@@ -55,6 +56,7 @@ type State = {
 
 type Action =
   | { type: "EVENTS_LOADED"; events: EventListItem[] }
+  | { type: "SHOW_ALL_CHANGED"; showAll: boolean }
   | { type: "EVENT_SELECTED"; id: string }
   | { type: "EXHIBITORS_LOADED"; exhibitors: LibraryExhibitor[] }
   | {
@@ -75,6 +77,7 @@ type Action =
 
 const initialState: State = {
   events: [],
+  showAllEvents: false,
   selectedId: null,
   exhibitors: [],
   filter: { tag: "all", search: "" },
@@ -90,6 +93,8 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "EVENTS_LOADED":
       return { ...state, events: action.events };
+    case "SHOW_ALL_CHANGED":
+      return { ...state, showAllEvents: action.showAll };
     case "EVENT_SELECTED":
       return {
         ...state,
@@ -382,6 +387,10 @@ export default function LibraryPage() {
         events={state.events}
         selectedId={state.selectedId}
         onChange={(id) => dispatch({ type: "EVENT_SELECTED", id })}
+        showAll={state.showAllEvents}
+        onShowAllChange={(showAll) =>
+          dispatch({ type: "SHOW_ALL_CHANGED", showAll })
+        }
       />
 
       {state.exhibitors.length > 0 && (

@@ -463,6 +463,18 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   color: var(--color-muted2);
   letter-spacing: 0.04em;
 }
+.event-picker-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.event-picker-toggle input[type="checkbox"] { cursor: pointer; }
 
 /* Library: tag picker + pill colors */
 .tag-picker {
