@@ -783,10 +783,89 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   }
 }
 
+/* Admin */
+.btn-secondary {
+  background: var(--color-bg2);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+.btn-secondary:hover { border-color: var(--color-border2); }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-danger {
+  background: transparent;
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+.btn-danger:hover { border-color: #ff6b6b; }
+.btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.event-add-form {
+  padding: 20px 0 8px;
+}
+.event-add-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 20px;
+}
+.event-add-field { display: flex; flex-direction: column; gap: 6px; }
+.event-add-field-wide { grid-column: 1 / -1; }
+.event-add-field > span {
+  font-family: var(--font-syne);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-muted2);
+}
+.event-add-field input[type="text"],
+.event-add-field input[type="url"],
+.event-add-field input[type="number"],
+.event-add-field select {
+  background: var(--color-bg2);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font: inherit;
+}
+.event-add-field input:focus,
+.event-add-field select:focus {
+  outline: none;
+  border-color: var(--color-accent-blue);
+}
+.event-add-checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.event-add-checkbox > span {
+  text-transform: none;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.event-add-error {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 107, 107, 0.08);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.event-add-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+.event-admin-row-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
 @media (max-width: 600px) {
   .wrap { padding: 32px 20px 60px; }
   .col-grid { grid-template-columns: 1fr; }
   .hero h1, .guide-hero h1 { font-size: 28px; }
   .input-row { flex-direction: column; }
   .tab-btn span { display: none; }
+  .event-add-grid { grid-template-columns: 1fr; }
 }
