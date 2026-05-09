@@ -19,7 +19,7 @@ function formatEmployees(n: number | null): string {
 
 function sourceLabel(row: LibraryExhibitor): string {
   if (row.source === "manual") return "manual";
-  if (row.apollo_matched) return "apollo";
+  if (row.apollo_matched) return "enriched";
   return "—";
 }
 
@@ -41,7 +41,7 @@ export function ExhibitorPreview({
         <span className="exhibitor-preview-title">Exhibitors</span>
         <span className="exhibitor-preview-count">
           {filtered ? `${rows.length} of ${total} · ` : ""}
-          {matched} / {total} enriched from Apollo
+          {matched} / {total} enriched
         </span>
       </div>
       {filterChildren}

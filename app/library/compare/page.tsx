@@ -118,8 +118,8 @@ export default function ComparePage() {
           <span className="hl-blue">multiple floors.</span>
         </h1>
         <p>
-          Exhibitors that appear at two or more events in the database. Apollo
-          enrichment is merged in where available.{" "}
+          Exhibitors that appear at two or more events in the database.
+          Enrichment data is merged in where available.{" "}
           <span className="event-attending-legend">
             <span className="event-attending">★ event</span> = my company is
             attending.

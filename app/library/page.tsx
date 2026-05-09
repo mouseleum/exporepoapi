@@ -401,7 +401,7 @@ export default function LibraryPage() {
         </h1>
         <p>
           Browse events from the database, see which exhibitors are already
-          enriched from Apollo, then score the list.
+          enriched, then score the list.
         </p>
       </div>
 

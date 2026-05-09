@@ -123,7 +123,7 @@ export default function TagsPage() {
         type: "STATUS",
         status: {
           kind: "info",
-          message: `✓ Tagged ${result.applied} companies as ${pasteTag} (${result.matched_in_apollo} found in Apollo data)`,
+          message: `✓ Tagged ${result.applied} companies as ${pasteTag} (${result.matched_in_apollo} found in enrichment data)`,
         },
       });
       setPasteText("");
@@ -183,8 +183,8 @@ export default function TagsPage() {
         </h1>
         <p>
           Paste a list of company names to bulk-tag. Tags are keyed by
-          normalized name, so they survive Apollo CSV reloads and apply across
-          every event.
+          normalized name, so they survive enrichment-data reloads and apply
+          across every event.
         </p>
       </div>
 
