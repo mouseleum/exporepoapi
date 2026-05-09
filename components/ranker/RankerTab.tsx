@@ -435,7 +435,7 @@ export function RankerTab() {
     const blob = new Blob([header + rows], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `expotential_top${state.rankedData.length}_targets.csv`;
+    a.download = `mikaels_top${state.rankedData.length}_targets.csv`;
     a.click();
   };
 

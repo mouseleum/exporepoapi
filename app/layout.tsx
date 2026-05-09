@@ -21,7 +21,7 @@ const chakraPetch = Chakra_Petch({
 });
 
 export const metadata: Metadata = {
-  title: "eXpotential — Exhibitor Tools",
+  title: "Mikael's — Exhibitor Tools",
   description: "AI-powered trade show exhibitor scoring and intelligence.",
 };
 

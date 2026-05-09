@@ -26,7 +26,7 @@ export function buildRankerPrompt(
 
   const countryWeightText = buildCountryWeightDirective(countryWeights);
 
-  return `You are a B2B sales intelligence assistant for eXpotential, an AI-powered event lead capture platform. eXpotential sells to marketing managers and event managers at companies that exhibit regularly at trade shows.
+  return `You are a B2B sales intelligence assistant for Mikael's, an AI-powered event lead capture platform. Mikael's sells to marketing managers and event managers at companies that exhibit regularly at trade shows.
 
 Exhibitor list (index|name|country|booth|enrichment data if available):
 ${listText}
@@ -58,7 +58,7 @@ Extract every company you can find. If unsure whether something is a company nam
 }
 
 export function buildGuidePrompt(url: string): string {
-  return `You are a practical trade show research assistant for eXpotential.
+  return `You are a practical trade show research assistant for Mikael's.
 
 The user wants to download the full exhibitor list from this trade show website:
 URL: ${url}
@@ -69,7 +69,7 @@ Use web search to find the exhibitor list page and analyse how the site works. L
 - Pagination structure
 - Any API endpoints that return exhibitor data
 
-Then generate clear step-by-step instructions to get the full exhibitor list as a file (CSV, Excel, or PDF) that can be uploaded to the eXpotential Ranker.
+Then generate clear step-by-step instructions to get the full exhibitor list as a file (CSV, Excel, or PDF) that can be uploaded to the Mikael's Ranker.
 
 Be specific: mention exact button names, URLs, menu items. If there's no export, suggest the most practical workaround (copy-paste, contacting the organiser, browser extension).
 

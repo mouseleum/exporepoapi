@@ -384,7 +384,7 @@ export default function LibraryPage() {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     const slug = selectedEvent?.slug ?? "library";
-    a.download = `expotential_${slug}_top${state.rankedData.length}.csv`;
+    a.download = `mikaels_${slug}_top${state.rankedData.length}.csv`;
     a.click();
   };
 
