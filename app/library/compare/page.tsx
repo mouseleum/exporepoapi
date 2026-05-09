@@ -121,7 +121,7 @@ export default function ComparePage() {
           Exhibitors that appear at two or more events in the database. Apollo
           enrichment is merged in where available.{" "}
           <span className="event-attending-legend">
-            <span className="event-attending">★ event</span> = Romify is
+            <span className="event-attending">★ event</span> = my company is
             attending.
           </span>
         </p>

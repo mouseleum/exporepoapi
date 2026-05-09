@@ -252,7 +252,7 @@ export function EventAddForm({ onCreate, busy }: Props) {
             onChange={(e) => setRomifyAttending(e.target.checked)}
             disabled={busy}
           />
-          <span>Romify is attending</span>
+          <span>My company is attending</span>
         </label>
       </div>
 

@@ -55,7 +55,7 @@ export function EventAdminTable({
             <th>Config</th>
             <th>Exhibitors</th>
             <th>Last scraped</th>
-            <th>Romify</th>
+            <th>My company</th>
             <th></th>
           </tr>
         </thead>

@@ -114,7 +114,7 @@ export default function AdminPage() {
           <span className="hl-blue">Add a show, fetch the floor.</span>
         </h1>
         <p>
-          Add events Romify cares about. Cron will scrape DIMEDIS and
+          Add events my company cares about. Cron will scrape DIMEDIS and
           Cybersec Europe automatically once a week, or use Fetch now.
         </p>
       </div>
