@@ -18,7 +18,7 @@ export function buildRankerPrompt(
       const e = enrichedMap[r.name.toLowerCase().trim()];
       const extras =
         e && e.matched
-          ? `|employees:${e.employee_count ?? "?"}|industry:${e.industry ?? "?"}`
+          ? `|employees:${e.employee_count ?? "?"}|industry:${e.industry ?? "?"}|revenue:${e.revenue_range ?? "?"}`
           : "";
       return `${i + 1}|${r.name}|${r.country}|${r.hall}${extras}`;
     })
@@ -32,7 +32,7 @@ Exhibitor list (index|name|country|booth|enrichment data if available):
 ${listText}
 
 Rank the TOP ${topN} companies most worth targeting. Score each 1–100 based on:
-1. Company size — use employee count data when available, otherwise estimate from brand knowledge. Larger = higher score.
+1. Company size — use employee count and annual revenue when available; otherwise estimate from brand knowledge. Larger headcount and higher revenue both raise the score.
 2. Industry fit — companies in manufacturing, technology, events, pharma, automotive, energy, and industrial sectors score higher
 3. Likelihood to exhibit at trade shows regularly — based on industry, company type, brand signals
 4. Known major global brands always score 80+${countryWeightText}
