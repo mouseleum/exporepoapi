@@ -25,6 +25,7 @@ export type LibraryExhibitor = {
   industry: string | null;
   annual_revenue: number | null;
   apollo_matched: boolean;
+  source: string | null;
   tag: TagValue | null;
 };
 
@@ -65,6 +66,7 @@ type ApolloRow = {
   employees: number | null;
   industry: string | null;
   annual_revenue: number | null;
+  source?: string | null;
 };
 
 const IN_CHUNK = 500;
@@ -115,6 +117,7 @@ export function joinEventExhibitors(
       industry: apollo?.industry ?? null,
       annual_revenue: apollo?.annual_revenue ?? null,
       apollo_matched: !!apollo,
+      source: apollo?.source ?? null,
       tag: tagMap.get(ee.name_normalized) ?? null,
     };
   });
@@ -307,7 +310,7 @@ export async function getEventExhibitors(
       (chunk) =>
         supabase
           .from("companies")
-          .select("name_normalized, country, employees, industry, annual_revenue")
+          .select("name_normalized, country, employees, industry, annual_revenue, source")
           .in("name_normalized", chunk),
       "getEventExhibitors apollo",
     ),

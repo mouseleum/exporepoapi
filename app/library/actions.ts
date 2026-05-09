@@ -21,6 +21,11 @@ import {
   type SyncCompanyInput,
   type SyncDbResult,
 } from "@/lib/library/queries";
+import {
+  saveManualCompanyEdit as _saveManualCompanyEdit,
+  type ManualEditInput,
+  type ManualEditResult,
+} from "@/lib/library/manual-edit";
 
 export async function listEvents(): Promise<EventListItem[]> {
   return _listEvents();
@@ -68,4 +73,10 @@ export async function syncCompaniesToDb(
   source: string,
 ): Promise<SyncDbResult> {
   return _syncCompaniesToDb(companies, source);
+}
+
+export async function saveManualCompanyEdit(
+  input: ManualEditInput,
+): Promise<ManualEditResult> {
+  return _saveManualCompanyEdit(input);
 }

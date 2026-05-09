@@ -36,6 +36,7 @@ describe("joinEventExhibitors", () => {
         industry: null,
         annual_revenue: null,
         apollo_matched: false,
+        source: null,
         tag: null,
       },
     ]);

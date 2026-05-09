@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Header } from "@/components/Header";
 import { TopNav } from "@/components/TopNav";
 import { StatusBox } from "@/components/StatusBox";
@@ -9,11 +9,13 @@ import { TargetCountSlider } from "@/components/ranker/TargetCountSlider";
 import { ResultsTable } from "@/components/ranker/ResultsTable";
 import { EventPicker } from "@/components/library/EventPicker";
 import { ExhibitorPreview } from "@/components/library/ExhibitorPreview";
+import { EditExhibitorModal } from "@/components/library/EditExhibitorModal";
 import { FilterBar } from "@/components/library/FilterBar";
 import {
   listEvents,
   getEventExhibitors,
   setCompanyTag,
+  saveManualCompanyEdit,
 } from "@/app/library/actions";
 import { runScoringPipeline } from "@/lib/scoring-pipeline";
 import {
@@ -161,6 +163,8 @@ function csvEscape(v: string | number | null): string {
 
 export default function LibraryPage() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [editingExhibitor, setEditingExhibitor] =
+    useState<LibraryExhibitor | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -277,6 +281,24 @@ export default function LibraryPage() {
         status: { kind: "error", message: "Tag save failed: " + message },
       });
     }
+  };
+
+  const handleManualEditSave = async (input: {
+    employees: number | null;
+    annual_revenue: number | null;
+    industry: string | null;
+  }) => {
+    if (!editingExhibitor || !state.selectedId) return;
+    await saveManualCompanyEdit({
+      raw_name: editingExhibitor.raw_name,
+      country: editingExhibitor.country || null,
+      employees: input.employees,
+      annual_revenue: input.annual_revenue,
+      industry: input.industry,
+    });
+    setEditingExhibitor(null);
+    const fresh = await getEventExhibitors(state.selectedId);
+    dispatch({ type: "EXHIBITORS_LOADED", exhibitors: fresh });
   };
 
   const runScoring = async () => {
@@ -433,6 +455,7 @@ export default function LibraryPage() {
           exhibitors={state.exhibitors}
           visible={visibleExhibitors}
           onTagChange={handleTagChange}
+          onEdit={(ex) => setEditingExhibitor(ex)}
           filterChildren={
             <FilterBar
               filter={state.filter}
@@ -440,6 +463,14 @@ export default function LibraryPage() {
               onChange={(filter) => dispatch({ type: "FILTER_CHANGED", filter })}
             />
           }
+        />
+      )}
+
+      {editingExhibitor && (
+        <EditExhibitorModal
+          exhibitor={editingExhibitor}
+          onCancel={() => setEditingExhibitor(null)}
+          onSave={handleManualEditSave}
         />
       )}
 

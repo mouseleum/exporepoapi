@@ -8,6 +8,7 @@ type ExhibitorPreviewProps = {
   exhibitors: LibraryExhibitor[];
   visible?: LibraryExhibitor[];
   onTagChange?: (name_normalized: string, tag: TagValue | null) => void;
+  onEdit?: (exhibitor: LibraryExhibitor) => void;
   filterChildren?: React.ReactNode;
 };
 
@@ -16,10 +17,17 @@ function formatEmployees(n: number | null): string {
   return n.toLocaleString();
 }
 
+function sourceLabel(row: LibraryExhibitor): string {
+  if (row.source === "manual") return "manual";
+  if (row.apollo_matched) return "apollo";
+  return "—";
+}
+
 export function ExhibitorPreview({
   exhibitors,
   visible,
   onTagChange,
+  onEdit,
   filterChildren,
 }: ExhibitorPreviewProps) {
   const total = exhibitors.length;
@@ -58,7 +66,34 @@ export function ExhibitorPreview({
           <tbody>
             {rows.map((row) => (
               <tr key={row.name_normalized}>
-                <td className="company-cell">{row.raw_name}</td>
+                <td className="company-cell">
+                  <span className="company-name-wrap">
+                    <span>{row.raw_name}</span>
+                    {row.source === "manual" && (
+                      <span className="tag-manual">manual</span>
+                    )}
+                    {onEdit && (
+                      <button
+                        type="button"
+                        className="edit-btn"
+                        aria-label={`Edit ${row.raw_name}`}
+                        onClick={() => onEdit(row)}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                        </svg>
+                      </button>
+                    )}
+                  </span>
+                </td>
                 <td className="country-cell">{row.country || "—"}</td>
                 <td className="hall-cell">{row.hall || "—"}</td>
                 <td className="hall-cell">{row.booth ?? "—"}</td>
@@ -69,9 +104,7 @@ export function ExhibitorPreview({
                   {formatRevenueUsd(row.annual_revenue) ?? "—"}
                 </td>
                 <td className="industry-cell">{row.industry ?? "—"}</td>
-                <td className="hall-cell">
-                  {row.apollo_matched ? "apollo" : "—"}
-                </td>
+                <td className="hall-cell">{sourceLabel(row)}</td>
                 <td>
                   <TagPicker
                     value={row.tag}
