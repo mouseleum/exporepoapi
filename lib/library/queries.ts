@@ -32,7 +32,13 @@ export type LibraryExhibitor = {
 export type CrossEventCompany = {
   name_normalized: string;
   display_name: string;
-  events: { id: string; slug: string; name: string; year: number | null }[];
+  events: {
+    id: string;
+    slug: string;
+    name: string;
+    year: number | null;
+    romify_attending: boolean;
+  }[];
   country: string;
   employees: number | null;
   industry: string | null;
@@ -50,6 +56,7 @@ type EventRef = {
   slug: string;
   name: string;
   year: number | null;
+  romify_attending: boolean;
 };
 
 type EeRow = {
@@ -199,13 +206,22 @@ export async function getCrossEventExhibitors(
   opts: { romifyOnly?: boolean } = {},
   supabase: SupabaseClient = createServiceClient(),
 ): Promise<CrossEventCompany[]> {
-  let eventsQuery = supabase.from("events").select("id, slug, name, year");
+  let eventsQuery = supabase
+    .from("events")
+    .select("id, slug, name, year, romify_attending");
   if (opts.romifyOnly) {
     eventsQuery = eventsQuery.eq("romify_attending", true);
   }
   const { data: events, error: evErr } = await eventsQuery;
   if (evErr) throw new Error(`getCrossEventExhibitors events: ${evErr.message}`);
-  const eventList = (events as EventRef[] | null) ?? [];
+  const rawEvents = (events as Array<Omit<EventRef, "romify_attending"> & { romify_attending: boolean | null }> | null) ?? [];
+  const eventList: EventRef[] = rawEvents.map((e) => ({
+    id: e.id,
+    slug: e.slug,
+    name: e.name,
+    year: e.year,
+    romify_attending: !!e.romify_attending,
+  }));
   if (eventList.length === 0) return [];
   const allowedEventIds = new Set(eventList.map((e) => e.id));
 

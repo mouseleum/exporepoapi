@@ -175,9 +175,9 @@ describe("joinEventExhibitors", () => {
 
 describe("groupCrossEventCompanies", () => {
   const events = [
-    { id: "e1", slug: "show-a", name: "Show A", year: 2025 },
-    { id: "e2", slug: "show-b", name: "Show B", year: 2026 },
-    { id: "e3", slug: "show-c", name: "Show C", year: 2026 },
+    { id: "e1", slug: "show-a", name: "Show A", year: 2025, romify_attending: true },
+    { id: "e2", slug: "show-b", name: "Show B", year: 2026, romify_attending: true },
+    { id: "e3", slug: "show-c", name: "Show C", year: 2026, romify_attending: true },
   ];
 
   it("returns [] when no inputs", () => {
@@ -387,8 +387,8 @@ describe("joinEventExhibitors with tags", () => {
 
 describe("groupCrossEventCompanies with tags", () => {
   const events = [
-    { id: "e1", slug: "show-a", name: "Show A", year: 2025 },
-    { id: "e2", slug: "show-b", name: "Show B", year: 2026 },
+    { id: "e1", slug: "show-a", name: "Show A", year: 2025, romify_attending: true },
+    { id: "e2", slug: "show-b", name: "Show B", year: 2026, romify_attending: true },
   ];
 
   it("populates tag on cross-event rows when present", () => {

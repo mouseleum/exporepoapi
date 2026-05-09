@@ -530,6 +530,16 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   font-size: 11px;
   color: var(--color-muted2);
 }
+.event-attending {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.event-attending-count { color: var(--color-accent); }
+.event-attending-legend {
+  font-size: 13px;
+  color: var(--color-muted2);
+}
+.event-attending-legend .event-attending { font-weight: 600; }
 .empty-state {
   margin-top: 32px;
   padding: 32px;

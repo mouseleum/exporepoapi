@@ -17,20 +17,17 @@ import type { Status } from "@/lib/types";
 
 type State = {
   rows: CrossEventCompany[];
-  showAllEvents: boolean;
   filter: FilterState;
   status: Status;
 };
 
 type Action =
   | { type: "ROWS_LOADED"; rows: CrossEventCompany[] }
-  | { type: "SHOW_ALL_CHANGED"; showAll: boolean }
   | { type: "FILTER_CHANGED"; filter: FilterState }
   | { type: "STATUS"; status: Status };
 
 const initialState: State = {
   rows: [],
-  showAllEvents: false,
   filter: { tag: "all", search: "" },
   status: { kind: "idle" },
 };
@@ -39,8 +36,6 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "ROWS_LOADED":
       return { ...state, rows: action.rows, status: { kind: "idle" } };
-    case "SHOW_ALL_CHANGED":
-      return { ...state, showAllEvents: action.showAll, rows: [] };
     case "FILTER_CHANGED":
       return { ...state, filter: action.filter };
     case "STATUS":
@@ -66,7 +61,7 @@ export default function ComparePage() {
       type: "STATUS",
       status: { kind: "loading", message: "Loading cross-event data…" },
     });
-    getCrossEventExhibitors({ romifyOnly: !state.showAllEvents })
+    getCrossEventExhibitors()
       .then((rows) => {
         if (cancelled) return;
         dispatch({ type: "ROWS_LOADED", rows });
@@ -82,7 +77,7 @@ export default function ComparePage() {
     return () => {
       cancelled = true;
     };
-  }, [state.showAllEvents]);
+  }, []);
 
   const { rows } = state;
 
@@ -124,21 +119,12 @@ export default function ComparePage() {
         </h1>
         <p>
           Exhibitors that appear at two or more events in the database. Apollo
-          enrichment is merged in where available.
+          enrichment is merged in where available.{" "}
+          <span className="event-attending-legend">
+            <span className="event-attending">★ event</span> = Romify is
+            attending.
+          </span>
         </p>
-      </div>
-
-      <div className="event-picker">
-        <label className="event-picker-toggle">
-          <input
-            type="checkbox"
-            checked={state.showAllEvents}
-            onChange={(e) =>
-              dispatch({ type: "SHOW_ALL_CHANGED", showAll: e.target.checked })
-            }
-          />
-          <span>Show all events (not just Romify-attending)</span>
-        </label>
       </div>
 
       <StatusBox status={state.status} />
@@ -177,34 +163,56 @@ export default function ComparePage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map((r) => (
-                  <tr key={r.name_normalized}>
-                    <td className="company-cell">{r.display_name}</td>
-                    <td className="country-cell">{r.country || "—"}</td>
-                    <td className="country-cell">
-                      {formatEmployees(r.employees)}
-                    </td>
-                    <td className="country-cell">
-                      {formatRevenueUsd(r.annual_revenue) ?? "—"}
-                    </td>
-                    <td className="industry-cell">{r.industry ?? "—"}</td>
-                    <td className="hall-cell">
-                      {r.tag ? (
-                        <span className={`tag-pill tag-${r.tag}`}>{r.tag}</span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="hall-cell">
-                      <span className="event-count-badge">
-                        {r.events.length}
-                      </span>
-                      <span className="event-list">
-                        {r.events.map(formatEvent).join(", ")}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {visibleRows.map((r) => {
+                  const attendingCount = r.events.filter(
+                    (e) => e.romify_attending,
+                  ).length;
+                  return (
+                    <tr key={r.name_normalized}>
+                      <td className="company-cell">{r.display_name}</td>
+                      <td className="country-cell">{r.country || "—"}</td>
+                      <td className="country-cell">
+                        {formatEmployees(r.employees)}
+                      </td>
+                      <td className="country-cell">
+                        {formatRevenueUsd(r.annual_revenue) ?? "—"}
+                      </td>
+                      <td className="industry-cell">{r.industry ?? "—"}</td>
+                      <td className="hall-cell">
+                        {r.tag ? (
+                          <span className={`tag-pill tag-${r.tag}`}>{r.tag}</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="hall-cell">
+                        <span className="event-count-badge">
+                          {r.events.length}
+                          {attendingCount > 0 && (
+                            <span className="event-attending-count">
+                              {" "}
+                              · {attendingCount}★
+                            </span>
+                          )}
+                        </span>
+                        <span className="event-list">
+                          {r.events.map((e, i) => (
+                            <span
+                              key={e.id}
+                              className={
+                                e.romify_attending ? "event-attending" : ""
+                              }
+                            >
+                              {e.romify_attending ? "★ " : ""}
+                              {formatEvent(e)}
+                              {i < r.events.length - 1 ? ", " : ""}
+                            </span>
+                          ))}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
