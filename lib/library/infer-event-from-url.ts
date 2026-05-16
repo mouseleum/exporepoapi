@@ -93,13 +93,17 @@ function inferDimedis(url: URL): InferredEvent | null {
 }
 
 function inferSwapcardFromUrl(url: URL): { viewId: string } | null {
-  // visitor.<host> + /event/<slug>/exhibitors/<base64-viewId>
-  if (!url.host.startsWith("visitor.")) return null;
+  // Swapcard white labels show up under many hostnames:
+  //   visitor.<show>.com/event/<slug>/exhibitors/<viewId>
+  //   attendees.<vendor>.com/widget/event/<slug>/exhibitors/<viewId>
+  // The viewId base64 always decodes to "EventView_<n>" (RXZlbnRWaWV3Xz…).
   const m = url.pathname.match(
-    /^\/event\/[^/]+\/exhibitors\/([A-Za-z0-9_=\-+/]+)\/?$/,
+    /\/event\/[^/]+\/exhibitors\/([A-Za-z0-9_=\-+/]+)\/?$/,
   );
   if (!m || !m[1]) return null;
-  return { viewId: m[1] };
+  const viewId = m[1];
+  if (!viewId.startsWith("RXZlbnRWaWV3Xz")) return null;
+  return { viewId };
 }
 
 type SwapcardEventNode = {
@@ -215,18 +219,84 @@ async function inferSwapcard(url: URL): Promise<InferredEvent | null> {
   };
 }
 
-export async function inferEventFromUrl(
-  raw: string,
-): Promise<InferredEvent | null> {
+function findKnownIframeUrl(html: string, base: URL): string | null {
+  // Pull every iframe src and pick the first one that any of our detectors
+  // already know how to handle. Keeps iframe-sniffing decoupled from the
+  // per-platform detectors — they remain the source of truth.
+  const re = /<iframe[^>]+src=(?:"([^"]+)"|'([^']+)')/gi;
+  for (const m of html.matchAll(re)) {
+    const raw = (m[1] ?? m[2] ?? "").trim();
+    if (!raw) continue;
+    let abs: URL;
+    try {
+      abs = new URL(raw, base);
+    } catch {
+      continue;
+    }
+    if (abs.protocol !== "http:" && abs.protocol !== "https:") continue;
+    if (
+      inferCyberseceurope(abs) ||
+      inferExpoFp(abs) ||
+      inferMapYourShow(abs) ||
+      inferDimedis(abs) ||
+      inferSwapcardFromUrl(abs)
+    ) {
+      return abs.toString();
+    }
+  }
+  return null;
+}
+
+async function inferFromIframe(url: URL): Promise<InferredEvent | null> {
+  let html: string;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    html = await res.text();
+  } catch {
+    return null;
+  }
+  if (
+    html.includes("Attention Required") ||
+    html.includes("Just a moment") ||
+    html.includes("cf-browser-verification")
+  ) {
+    return null;
+  }
+  const iframeUrl = findKnownIframeUrl(html, url);
+  if (!iframeUrl) return null;
+  return inferOnce(iframeUrl);
+}
+
+async function inferOnce(raw: string): Promise<InferredEvent | null> {
   const url = safeParseUrl(raw);
   if (!url) return null;
-
   const syncMatch =
     inferCyberseceurope(url) ??
     inferExpoFp(url) ??
     inferMapYourShow(url) ??
     inferDimedis(url);
   if (syncMatch) return syncMatch;
+  if (inferSwapcardFromUrl(url)) return inferSwapcard(url);
+  return null;
+}
 
-  return inferSwapcard(url);
+export async function inferEventFromUrl(
+  raw: string,
+): Promise<InferredEvent | null> {
+  const direct = await inferOnce(raw);
+  if (direct) return direct;
+  const url = safeParseUrl(raw);
+  if (!url) return null;
+  return inferFromIframe(url);
 }

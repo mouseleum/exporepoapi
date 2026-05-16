@@ -116,7 +116,9 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
     try {
       const result = await onInfer(trimmed);
       if (!result) {
-        setInferNote("Couldn't detect the platform from this URL.");
+        setInferNote(
+          "Couldn't detect the platform from this URL. If the exhibitor list is in an iframe on the page, try right-clicking it and pasting the iframe's URL.",
+        );
         return;
       }
       setFamily(result.family);

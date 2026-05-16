@@ -189,6 +189,11 @@ describe("inferEventFromUrl — swapcard", () => {
 
 describe("inferEventFromUrl — rejection paths", () => {
   it("returns null for unknown hosts", async () => {
+    // Stub fetch so the iframe-sniff fallback doesn't hit the real network.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 404, text: async () => "" })),
+    );
     const out = await inferEventFromUrl("https://example.org/foo");
     expect(out).toBeNull();
   });
@@ -197,5 +202,99 @@ describe("inferEventFromUrl — rejection paths", () => {
     expect(await inferEventFromUrl("")).toBeNull();
     expect(await inferEventFromUrl("not a url")).toBeNull();
     expect(await inferEventFromUrl("javascript:alert(1)")).toBeNull();
+  });
+});
+
+describe("inferEventFromUrl — swapcard white labels", () => {
+  it("detects attendees.toc-go.com/widget/event/.../exhibitors/<viewId>", async () => {
+    const html = SWAP_HTML({
+      id: "RXZlbnRfNDMyNTEwMQ==",
+      title: "TOC Europe & CSC Live 2026",
+      beginsAt: "2026-05-19T09:00:00+02:00",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, status: 200, text: async () => html })),
+    );
+    const out = await inferEventFromUrl(
+      "https://attendees.toc-go.com/widget/event/toc-europe-and-csc-live-2026/exhibitors/RXZlbnRWaWV3XzEyNTUyNzg=",
+    );
+    expect(out?.family).toBe("swapcard");
+    expect(out?.adapter_config).toEqual({
+      viewId: "RXZlbnRWaWV3XzEyNTUyNzg=",
+      eventId: "RXZlbnRfNDMyNTEwMQ==",
+    });
+    expect(out?.suggestedName).toBe("TOC Europe & CSC Live 2026");
+    expect(out?.suggestedYear).toBe(2026);
+  });
+
+  it("rejects /exhibitors/<not-a-viewId>", async () => {
+    const out = await inferEventFromUrl(
+      "https://example.com/event/foo/exhibitors/notavalidviewid",
+    );
+    expect(out).toBeNull();
+  });
+});
+
+describe("inferEventFromUrl — iframe-sniff fallback", () => {
+  const OUTER_URL = "https://www.tocevents-europe.com/en/attend/exhibitor-list.html";
+  const INNER_VIEW_ID = "RXZlbnRWaWV3XzEyNTUyNzg=";
+  const INNER_URL = `https://attendees.toc-go.com/widget/event/toc-europe-and-csc-live-2026/exhibitors/${INNER_VIEW_ID}`;
+
+  it("follows an iframe to a Swapcard URL and resolves it", async () => {
+    const outerHtml = `<html><body><iframe src="${INNER_URL}?source=iframe-only"></iframe></body></html>`;
+    const innerHtml = SWAP_HTML({
+      id: "RXZlbnRfNDMyNTEwMQ==",
+      title: "TOC Europe & CSC Live 2026",
+      beginsAt: "2026-05-19T09:00:00+02:00",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          text: async () => outerHtml,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          text: async () => innerHtml,
+        }),
+    );
+    const out = await inferEventFromUrl(OUTER_URL);
+    expect(out?.family).toBe("swapcard");
+    expect(out?.adapter_config).toMatchObject({
+      viewId: INNER_VIEW_ID,
+      eventId: "RXZlbnRfNDMyNTEwMQ==",
+    });
+  });
+
+  it("gives up gracefully when the outer page is Cloudflare-walled", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        text: async () =>
+          "<html><title>Attention Required! | Cloudflare</title></html>",
+      })),
+    );
+    const out = await inferEventFromUrl(OUTER_URL);
+    expect(out).toBeNull();
+  });
+
+  it("returns null when the page has no recognisable iframe", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        text: async () => "<html><body><p>no iframes here</p></body></html>",
+      })),
+    );
+    const out = await inferEventFromUrl(OUTER_URL);
+    expect(out).toBeNull();
   });
 });
