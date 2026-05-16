@@ -3,12 +3,14 @@ import { dimedisFactory } from "./dimedis";
 import { cyberseceuropeFactory } from "./cyberseceurope";
 import { mapyourshowFactory } from "./mapyourshow";
 import { expofpFactory } from "./expofp";
+import { swapcardFactory } from "./swapcard";
 
 export const ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
   dimedis: dimedisFactory,
   cyberseceurope: cyberseceuropeFactory,
   mapyourshow: mapyourshowFactory,
   expofp: expofpFactory,
+  swapcard: swapcardFactory,
 };
 
 export function getAdapterFactory(family: string): AdapterFactory | undefined {
