@@ -4,17 +4,32 @@ import { useMemo, useState } from "react";
 import { z } from "zod";
 import { DimedisConfigSchema } from "@/lib/adapters/dimedis";
 import { MapYourShowConfigSchema } from "@/lib/adapters/mapyourshow";
+import { ExpoFpConfigSchema } from "@/lib/adapters/expofp";
+import { SwapcardConfigSchema } from "@/lib/adapters/swapcard";
 import type { CreateEventInput } from "@/lib/library/admin-queries";
 
-type Family = "dimedis" | "cyberseceurope" | "mapyourshow";
+type Family =
+  | "dimedis"
+  | "cyberseceurope"
+  | "mapyourshow"
+  | "expofp"
+  | "swapcard";
 
 const FAMILY_LABELS: Record<Family, string> = {
   dimedis: "DIMEDIS Vis (interpack, drupa, medica, glasstec, boot, …)",
   cyberseceurope: "Cybersec Europe (static HTML)",
   mapyourshow: "MapYourShow (Battery Show, NAB, IBC, …)",
+  expofp: "ExpoFP (MBS Festival, …)",
+  swapcard: "Swapcard (Vitafoods, …)",
 };
 
-const FAMILIES: Family[] = ["dimedis", "cyberseceurope", "mapyourshow"];
+const FAMILIES: Family[] = [
+  "dimedis",
+  "cyberseceurope",
+  "mapyourshow",
+  "expofp",
+  "swapcard",
+];
 
 function slugify(name: string, year: number | null): string {
   const base = name
@@ -39,10 +54,16 @@ export function EventAddForm({ onCreate, busy }: Props) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [romifyAttending, setRomifyAttending] = useState(true);
 
-  // dimedis-only config
+  // dimedis / mapyourshow
   const [domain, setDomain] = useState("");
   const [lang, setLang] = useState("");
   const [minExhibitors, setMinExhibitors] = useState("");
+  // expofp
+  const [expoKey, setExpoKey] = useState("");
+  // swapcard
+  const [viewId, setViewId] = useState("");
+  const [eventId, setEventId] = useState("");
+  const [persistedQueryHash, setPersistedQueryHash] = useState("");
 
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -67,6 +88,10 @@ export function EventAddForm({ onCreate, busy }: Props) {
     setDomain("");
     setLang("");
     setMinExhibitors("");
+    setExpoKey("");
+    setViewId("");
+    setEventId("");
+    setPersistedQueryHash("");
     setRomifyAttending(true);
     setFormError(null);
   };
@@ -74,8 +99,17 @@ export function EventAddForm({ onCreate, busy }: Props) {
   const buildAdapterConfig = (): unknown => {
     if (family === "cyberseceurope") return {};
     const cfg: Record<string, unknown> = {};
-    if (domain.trim()) cfg.domain = domain.trim();
-    if (family === "dimedis" && lang.trim()) cfg.lang = lang.trim();
+    if (family === "dimedis" || family === "mapyourshow") {
+      if (domain.trim()) cfg.domain = domain.trim();
+      if (family === "dimedis" && lang.trim()) cfg.lang = lang.trim();
+    }
+    if (family === "expofp" && expoKey.trim()) cfg.expoKey = expoKey.trim();
+    if (family === "swapcard") {
+      if (viewId.trim()) cfg.viewId = viewId.trim();
+      if (eventId.trim()) cfg.eventId = eventId.trim();
+      if (persistedQueryHash.trim())
+        cfg.persistedQueryHash = persistedQueryHash.trim();
+    }
     if (minExhibitors.trim() !== "") {
       const n = Number(minExhibitors);
       if (Number.isInteger(n) && n >= 0) cfg.minExhibitors = n;
@@ -96,7 +130,11 @@ export function EventAddForm({ onCreate, busy }: Props) {
         ? DimedisConfigSchema
         : family === "mapyourshow"
           ? MapYourShowConfigSchema
-          : null;
+          : family === "expofp"
+            ? ExpoFpConfigSchema
+            : family === "swapcard"
+              ? SwapcardConfigSchema
+              : null;
     if (schema) {
       const parsed = schema.safeParse(adapterConfig);
       if (!parsed.success) {
@@ -193,7 +231,11 @@ export function EventAddForm({ onCreate, busy }: Props) {
                 ? "https://www.cyberseceurope.com/visit/exhibitor-list"
                 : family === "mapyourshow"
                   ? "https://tbse26.mapyourshow.com/8_0/explore/exhibitor-gallery.cfm?featured=false"
-                  : "https://www.example.com/vis/v1/en/directory/a"
+                  : family === "expofp"
+                    ? "https://app.expofp.com/home/<expoKey>"
+                    : family === "swapcard"
+                      ? "https://visitor.<show>.com/event/<slug>/exhibitors/<viewId>"
+                      : "https://www.example.com/vis/v1/en/directory/a"
             }
             disabled={busy}
             required
@@ -231,18 +273,72 @@ export function EventAddForm({ onCreate, busy }: Props) {
                 />
               </label>
             )}
+          </>
+        )}
+
+        {family === "expofp" && (
+          <label className="event-add-field">
+            <span>Expo key (subdomain)</span>
+            <input
+              type="text"
+              value={expoKey}
+              onChange={(e) => setExpoKey(e.target.value)}
+              placeholder="mbsfestival"
+              disabled={busy}
+              required
+            />
+          </label>
+        )}
+
+        {family === "swapcard" && (
+          <>
             <label className="event-add-field">
-              <span>Min exhibitors (optional)</span>
+              <span>View ID (base64)</span>
               <input
-                type="number"
-                value={minExhibitors}
-                onChange={(e) => setMinExhibitors(e.target.value)}
-                placeholder="50"
-                min="0"
+                type="text"
+                value={viewId}
+                onChange={(e) => setViewId(e.target.value)}
+                placeholder="RXZlbnRWaWV3Xzxxxxxxx="
+                disabled={busy}
+                required
+              />
+            </label>
+            <label className="event-add-field">
+              <span>Event ID (base64)</span>
+              <input
+                type="text"
+                value={eventId}
+                onChange={(e) => setEventId(e.target.value)}
+                placeholder="RXZlbnRfxxxxxxx="
+                disabled={busy}
+                required
+              />
+            </label>
+            <label className="event-add-field event-add-field-wide">
+              <span>Persisted query hash (optional)</span>
+              <input
+                type="text"
+                value={persistedQueryHash}
+                onChange={(e) => setPersistedQueryHash(e.target.value)}
+                placeholder="leave blank to use default"
                 disabled={busy}
               />
             </label>
           </>
+        )}
+
+        {family !== "cyberseceurope" && (
+          <label className="event-add-field">
+            <span>Min exhibitors (optional)</span>
+            <input
+              type="number"
+              value={minExhibitors}
+              onChange={(e) => setMinExhibitors(e.target.value)}
+              placeholder="50"
+              min="0"
+              disabled={busy}
+            />
+          </label>
         )}
 
         <label className="event-add-field event-add-checkbox">
