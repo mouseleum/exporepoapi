@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { DimedisConfigSchema } from "@/lib/adapters/dimedis";
 import { MapYourShowConfigSchema } from "@/lib/adapters/mapyourshow";
 import { ExpoFpConfigSchema } from "@/lib/adapters/expofp";
 import { SwapcardConfigSchema } from "@/lib/adapters/swapcard";
 import type { CreateEventInput } from "@/lib/library/admin-queries";
+import type { InferredEvent } from "@/lib/library/infer-event-from-url";
 
 type Family =
   | "dimedis"
@@ -37,15 +38,19 @@ function slugify(name: string, year: number | null): string {
     .normalize("NFKD")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return year ? `${base}-${year}` : base;
+  if (!year) return base;
+  return base.endsWith(`-${year}`) || base === String(year)
+    ? base
+    : `${base}-${year}`;
 }
 
 type Props = {
   onCreate: (input: CreateEventInput) => Promise<void>;
+  onInfer?: (url: string) => Promise<InferredEvent | null>;
   busy: boolean;
 };
 
-export function EventAddForm({ onCreate, busy }: Props) {
+export function EventAddForm({ onCreate, onInfer, busy }: Props) {
   const [family, setFamily] = useState<Family>("dimedis");
   const [name, setName] = useState("");
   const [year, setYear] = useState<string>("");
@@ -66,6 +71,9 @@ export function EventAddForm({ onCreate, busy }: Props) {
   const [persistedQueryHash, setPersistedQueryHash] = useState("");
 
   const [formError, setFormError] = useState<string | null>(null);
+  const [inferNote, setInferNote] = useState<string | null>(null);
+  const [inferring, setInferring] = useState(false);
+  const lastInferredUrl = useRef<string>("");
 
   const yearNum = useMemo<number | null>(() => {
     if (year.trim() === "") return null;
@@ -94,6 +102,50 @@ export function EventAddForm({ onCreate, busy }: Props) {
     setPersistedQueryHash("");
     setRomifyAttending(true);
     setFormError(null);
+    setInferNote(null);
+    lastInferredUrl.current = "";
+  };
+
+  const runInfer = async () => {
+    if (!onInfer) return;
+    const trimmed = sourceUrl.trim();
+    if (!trimmed || trimmed === lastInferredUrl.current) return;
+    lastInferredUrl.current = trimmed;
+    setInferring(true);
+    setInferNote(null);
+    try {
+      const result = await onInfer(trimmed);
+      if (!result) {
+        setInferNote("Couldn't detect the platform from this URL.");
+        return;
+      }
+      setFamily(result.family);
+      const cfg = result.adapter_config as Record<string, unknown>;
+      if (typeof cfg.domain === "string" && !domain) setDomain(cfg.domain);
+      if (typeof cfg.lang === "string" && !lang) setLang(cfg.lang);
+      if (typeof cfg.expoKey === "string" && !expoKey) setExpoKey(cfg.expoKey);
+      if (typeof cfg.viewId === "string" && !viewId) setViewId(cfg.viewId);
+      if (typeof cfg.eventId === "string" && !eventId) setEventId(cfg.eventId);
+      if (result.suggestedName && !name.trim()) setName(result.suggestedName);
+      if (
+        typeof result.suggestedYear === "number" &&
+        year.trim() === ""
+      ) {
+        setYear(String(result.suggestedYear));
+      }
+      if (result.partial && result.warning) {
+        setInferNote(result.warning);
+      } else {
+        setInferNote(
+          `Detected ${result.family}${result.suggestedName ? ` — ${result.suggestedName}` : ""}.`,
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setInferNote(`Detect failed: ${msg}`);
+    } finally {
+      setInferring(false);
+    }
   };
 
   const buildAdapterConfig = (): unknown => {
@@ -221,11 +273,19 @@ export function EventAddForm({ onCreate, busy }: Props) {
         </label>
 
         <label className="event-add-field event-add-field-wide">
-          <span>Source URL</span>
+          <span>
+            Source URL{" "}
+            {onInfer ? (
+              <em style={{ opacity: 0.6, fontWeight: 400 }}>
+                — paste to auto-detect
+              </em>
+            ) : null}
+          </span>
           <input
             type="url"
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
+            onBlur={runInfer}
             placeholder={
               family === "cyberseceurope"
                 ? "https://www.cyberseceurope.com/visit/exhibitor-list"
@@ -240,6 +300,11 @@ export function EventAddForm({ onCreate, busy }: Props) {
             disabled={busy}
             required
           />
+          {inferring ? (
+            <small style={{ opacity: 0.7 }}>Detecting…</small>
+          ) : inferNote ? (
+            <small style={{ opacity: 0.8 }}>{inferNote}</small>
+          ) : null}
         </label>
 
         {(family === "dimedis" || family === "mapyourshow") && (

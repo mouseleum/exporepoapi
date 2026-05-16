@@ -11,6 +11,10 @@ import {
   type UpdateEventPatch,
 } from "@/lib/library/admin-queries";
 import type { LoadEventResult } from "@/lib/library/load-event";
+import {
+  inferEventFromUrl as _inferEventFromUrl,
+  type InferredEvent,
+} from "@/lib/library/infer-event-from-url";
 
 export async function listAllAdminEvents(): Promise<AdminEventRow[]> {
   return _listAllAdminEvents();
@@ -37,4 +41,10 @@ export async function triggerEventFetch(
   id: string,
 ): Promise<LoadEventResult> {
   return _triggerEventFetch(id);
+}
+
+export async function inferEventFromUrl(
+  url: string,
+): Promise<InferredEvent | null> {
+  return _inferEventFromUrl(url);
 }

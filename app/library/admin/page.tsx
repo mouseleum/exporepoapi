@@ -9,6 +9,7 @@ import { EventAdminTable } from "@/components/library/EventAdminTable";
 import {
   createEvent,
   deleteEvent,
+  inferEventFromUrl,
   listAllAdminEvents,
   triggerEventFetch,
   updateEvent,
@@ -123,7 +124,11 @@ export default function AdminPage() {
         <div className="results-header">
           <span className="results-title">Add event</span>
         </div>
-        <EventAddForm onCreate={handleCreate} busy={creating} />
+        <EventAddForm
+          onCreate={handleCreate}
+          onInfer={inferEventFromUrl}
+          busy={creating}
+        />
       </div>
 
       <StatusBox status={status} />
