@@ -98,35 +98,55 @@ export async function POST(req: Request): Promise<Response> {
   });
 }
 
-async function enrichOne(
+const RATE_LIMIT_RETRY_MS = 1100;
+
+async function pdlGet(
   company: CompanyInput,
   apiKey: string,
-): Promise<EnrichOneOutcome> {
+): Promise<Response> {
   const params = new URLSearchParams({
     name: company.name,
     api_key: apiKey,
   });
   if (company.country) params.append("location", company.country);
+  return fetch(`${PDL_URL}?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+}
 
+async function enrichOne(
+  company: CompanyInput,
+  apiKey: string,
+): Promise<EnrichOneOutcome> {
   try {
-    const response = await fetch(`${PDL_URL}?${params.toString()}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
+    let response = await pdlGet(company, apiKey);
+
+    // 429 = per-minute rate cap. Sleep briefly and retry once; only treat
+    // a persistent 429 as a transient miss for this company (no quota abort
+    // — paid-tier callers shouldn't lose the whole batch to one hot minute).
+    if (response.status === 429) {
+      await new Promise((r) => setTimeout(r, RATE_LIMIT_RETRY_MS));
+      response = await pdlGet(company, apiKey);
+      if (response.status === 429) {
+        return { result: { name: company.name, matched: false } };
+      }
+    }
 
     if (response.status !== 200) {
-      // 402 with "all matches used" means the free-tier lifetime quota is
-      // gone. 429 means the per-minute budget is gone. Both are fatal for the
-      // rest of this run — bubble up so the caller can stop early.
-      if (response.status === 402 || response.status === 429) {
-        let message = `PDL HTTP ${response.status}`;
+      // 402 "all matches used" = lifetime free-tier ceiling. This won't lift
+      // without topping up the account, so bubble it up to abort the run.
+      // (Other non-200s — 4xx data shape, 5xx transient — fall through to
+      // an un-matched result without aborting.)
+      if (response.status === 402) {
+        let message = `PDL HTTP 402`;
         try {
           const body = (await response.json()) as {
             error?: { message?: string };
           };
           if (body.error?.message) message = body.error.message;
         } catch {
-          /* leave the default message */
+          /* leave default message */
         }
         return {
           result: { name: company.name, matched: false },

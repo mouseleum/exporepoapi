@@ -210,9 +210,13 @@ async function loadPeopleForEvent(
   let upserted = 0;
   for (let i = 0; i < peopleRows.length; i += BATCH_SIZE) {
     const batch = peopleRows.slice(i, i + BATCH_SIZE);
+    // person_dedup_key is a generated column (coalesce(source_person_id, raw_name))
+    // owned by the DB — see db/migrations/0005_people_dedup_fix.sql. Upserting on
+    // it means people without an id from Swapcard dedupe by name instead of
+    // duplicating on every refresh.
     const { error } = await supabase
       .from("event_exhibitor_people")
-      .upsert(batch, { onConflict: "event_exhibitor_id,source_person_id" });
+      .upsert(batch, { onConflict: "event_exhibitor_id,person_dedup_key" });
     if (error) {
       throw new Error(
         `event_exhibitor_people upsert failed for ${adapter.meta.slug}: ${error.message}`,

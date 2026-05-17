@@ -216,6 +216,16 @@ export function swapcardFactory(meta: EventMeta, config: unknown): Adapter {
   async function fetchPeopleForExhibitor(
     exhibitorSourceId: string,
   ): Promise<RawPerson[]> {
+    // KNOWN LIMITATION: returns only the first page of `members` (~5 nodes
+    // per exhibitor) because `EventExhibitorDetailsViewQuery` ignores any
+    // `endCursor` variable we add — the page-size is baked into the
+    // persisted document. For exhibitors with more team members (ABB at TOC
+    // had 27, we get 5), the remainder is silently dropped.
+    //
+    // Phase 8b fix: capture the dedicated "load more members" persisted
+    // query from DevTools (requires being logged in to a Swapcard event,
+    // scrolling the team section, and reading the Network panel). Then
+    // loop with that hash + the endCursor in members.pageInfo.endCursor.
     const body = [
       {
         operationName: "EventExhibitorDetailsViewQuery",
