@@ -24,3 +24,12 @@ Phased, additive, every phase ends in a working app and a commit:
 8. **Phase 2: contacts/people enrichment** — only after Phase 1 has been useful for one show cycle.
 
 Don't skip ahead. Phase 1 does not start until Phase 0 is merged and verified on production.
+
+## PDL enrichment
+
+Parked behind `NEXT_PUBLIC_PDL_ENABLED` (default `false`) because the free-tier
+key is permanently exhausted (`HTTP 402 "all matches used"`). With the flag off
+the scoring pipeline skips `/api/enrich` and scores on Apollo-matched data +
+name + country only. Re-enable: set the env var to `"true"` in `.env.local`
+and the Vercel project env after topping up PDL. All PDL code (route,
+`enrichCompanies`, schemas) is left in place.

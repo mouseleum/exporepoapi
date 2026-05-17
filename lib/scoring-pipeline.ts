@@ -60,44 +60,52 @@ export async function runScoringPipeline(
   }
   const dbHits = rows.filter((r) => r.country).length;
 
-  callbacks.onStatus({
-    kind: "loading",
-    message: `DB filled ${dbHits} countries. Enriching with PeopleDataLabs...`,
-  });
-
   const enrichedMap: Record<string, EnrichedCompany> = {
     ...(options.prefilledEnriched ?? {}),
   };
-  const toEnrich = rows.filter((r) => !enrichedMap[nameKey(r.name)]);
+  const pdlEnabled = process.env.NEXT_PUBLIC_PDL_ENABLED === "true";
 
-  for (let i = 0; i < toEnrich.length; i += PDL_BATCH_SIZE) {
-    const batch = toEnrich
-      .slice(i, i + PDL_BATCH_SIZE)
-      .map((r) => ({ name: r.name, country: r.country }));
+  if (!pdlEnabled) {
+    callbacks.onStatus({
+      kind: "info",
+      message: `DB filled ${dbHits} countries. PDL enrichment disabled — scoring on Apollo-matched data only.`,
+    });
+  } else {
     callbacks.onStatus({
       kind: "loading",
-      message: `Enriching companies... (${Math.min(
-        i + PDL_BATCH_SIZE,
-        toEnrich.length,
-      )}/${toEnrich.length})`,
+      message: `DB filled ${dbHits} countries. Enriching with PeopleDataLabs...`,
     });
-    try {
-      const { results, quotaExhausted, quotaMessage } =
-        await enrichCompanies(batch);
-      for (const r of results) {
-        if (r.matched) enrichedMap[nameKey(r.name)] = r;
+
+    const toEnrich = rows.filter((r) => !enrichedMap[nameKey(r.name)]);
+    for (let i = 0; i < toEnrich.length; i += PDL_BATCH_SIZE) {
+      const batch = toEnrich
+        .slice(i, i + PDL_BATCH_SIZE)
+        .map((r) => ({ name: r.name, country: r.country }));
+      callbacks.onStatus({
+        kind: "loading",
+        message: `Enriching companies... (${Math.min(
+          i + PDL_BATCH_SIZE,
+          toEnrich.length,
+        )}/${toEnrich.length})`,
+      });
+      try {
+        const { results, quotaExhausted, quotaMessage } =
+          await enrichCompanies(batch);
+        for (const r of results) {
+          if (r.matched) enrichedMap[nameKey(r.name)] = r;
+        }
+        if (quotaExhausted) {
+          const reason =
+            quotaMessage ?? "PDL quota exhausted — skipping further enrichment";
+          callbacks.onStatus({
+            kind: "info",
+            message: `⚠ ${reason} (scoring will continue with Apollo matches only)`,
+          });
+          break;
+        }
+      } catch {
+        /* continue without enrichment */
       }
-      if (quotaExhausted) {
-        const reason =
-          quotaMessage ?? "PDL quota exhausted — skipping further enrichment";
-        callbacks.onStatus({
-          kind: "info",
-          message: `⚠ ${reason} (scoring will continue with Apollo matches only)`,
-        });
-        break;
-      }
-    } catch {
-      /* continue without enrichment */
     }
   }
 

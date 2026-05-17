@@ -107,12 +107,14 @@ function urlsCalled(calls: Array<{ url: string }>): string[] {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   syncMock.mockReset();
   syncMock.mockResolvedValue({ added: 1, updated: 0, total: 1 });
 });
 
 describe("runScoringPipeline", () => {
   it("end-to-end: DB lookup → PDL → score → sync writeback", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PDL_ENABLED", "true");
     const { calls } = setupFetchMocks({
       companyDb: {
         companies: [
@@ -209,6 +211,7 @@ describe("runScoringPipeline", () => {
   });
 
   it("invokes onStatus through the expected stages", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PDL_ENABLED", "true");
     setupFetchMocks({
       pdl: [{ name: "X", matched: false }],
       score: [{ rank: 1, name: "X", country: "", booth: "", score: 50 }],
@@ -257,7 +260,35 @@ describe("runScoringPipeline", () => {
     expect(events).toEqual(["results", "sync_status"]);
   });
 
+  it("PDL parked (flag off): skips /api/enrich entirely and tells the user", async () => {
+    // Default env: NEXT_PUBLIC_PDL_ENABLED is unset → treated as disabled.
+    const { calls } = setupFetchMocks({
+      score: [{ rank: 1, name: "ParkedCo", country: "", booth: "", score: 70 }],
+    });
+
+    const messages: string[] = [];
+    await runScoringPipeline(
+      [{ name: "ParkedCo" }],
+      { topN: 1, countryWeights: {}, source: "test" },
+      {
+        onStatus: (s) => {
+          if (s.kind !== "idle") messages.push(s.message);
+        },
+      },
+    );
+
+    const urls = urlsCalled(calls);
+    expect(urls.some((u) => u.includes("/api/enrich"))).toBe(false);
+    expect(
+      messages.some((m) =>
+        m.includes("PDL enrichment disabled — scoring on Apollo-matched data only"),
+      ),
+    ).toBe(true);
+    expect(messages.some((m) => m.includes("Scoring with AI"))).toBe(true);
+  });
+
   it("PDL fetch failure does not crash the pipeline", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PDL_ENABLED", "true");
     setupFetchMocks({
       score: [{ rank: 1, name: "Z", country: "", booth: "", score: 30 }],
     });
@@ -284,6 +315,7 @@ describe("runScoringPipeline", () => {
   });
 
   it("sync error surfaces as error status (does not throw)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PDL_ENABLED", "true");
     setupFetchMocks({
       pdl: [{ name: "Q", matched: false }],
       score: [{ rank: 1, name: "Q", country: "", booth: "", score: 40 }],

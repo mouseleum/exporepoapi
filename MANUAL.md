@@ -16,7 +16,7 @@ One-shot scoring for a list you have on disk.
 4. **Target count** — how many top picks you want (default 50).
 5. **Score with AI** — runs the pipeline:
    - Looks up each company in the Apollo deep store (employees, industry, revenue)
-   - Falls back to PeopleDataLabs for the rest
+   - Falls back to PeopleDataLabs for the rest (parked — see `CLAUDE.md`)
    - Asks Claude to rank them given your country weights
    - Shows top-N in a sortable table; "Download CSV" exports the result.
 
@@ -35,7 +35,7 @@ Score events you've already saved.
 
 - **Event picker** — dropdown of every saved event with exhibitor count and scrape date.
 - **Preview** shows the first ~50 exhibitors, with Apollo enrichment columns filled in where matched.
-- Same country weights + target count + **Score with AI** as Ranker. Apollo-matched rows skip the PDL call (already enriched).
+- Same country weights + target count + **Score with AI** as Ranker. Apollo-matched rows skip the PDL call (already enriched); PDL itself is currently parked behind `NEXT_PUBLIC_PDL_ENABLED`.
 - Search / filter to narrow the preview by name or country.
 
 Source events also include any auto-scraped shows (cyberseceurope, interpack, drupa, medica, glasstec, boot via the DIMEDIS adapter). The weekly cron refreshes them on Sundays.
