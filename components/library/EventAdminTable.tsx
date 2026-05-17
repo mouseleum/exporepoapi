@@ -6,9 +6,15 @@ import type { AdminEventRow } from "@/lib/library/admin-queries";
 type Props = {
   rows: AdminEventRow[];
   onToggleRomify: (id: string, value: boolean) => Promise<void>;
+  onTogglePeople: (id: string, value: boolean) => Promise<void>;
   onFetch: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
+
+function isPeopleEnabled(cfg: unknown): boolean {
+  if (!cfg || typeof cfg !== "object") return false;
+  return !!(cfg as { includePeople?: unknown }).includePeople;
+}
 
 function formatScraped(iso: string | null): string {
   if (!iso) return "never";
@@ -25,6 +31,7 @@ function formatConfig(cfg: unknown): string {
 export function EventAdminTable({
   rows,
   onToggleRomify,
+  onTogglePeople,
   onFetch,
   onDelete,
 }: Props) {
@@ -71,7 +78,31 @@ export function EventAdminTable({
                 <td className="hall-cell">{r.source}</td>
                 <td className="industry-cell">{formatConfig(r.adapter_config)}</td>
                 <td className="hall-cell">{r.exhibitor_count}</td>
-                <td className="hall-cell">{r.people_count || "—"}</td>
+                <td className="hall-cell">
+                  {r.source === "swapcard" ? (
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isPeopleEnabled(r.adapter_config)}
+                        disabled={busy}
+                        onChange={(e) =>
+                          handle(r.id, () =>
+                            onTogglePeople(r.id, e.target.checked),
+                          )
+                        }
+                      />
+                      <span>{r.people_count || "—"}</span>
+                    </label>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td className="hall-cell">{formatScraped(r.scraped_at)}</td>
                 <td>
                   <input
