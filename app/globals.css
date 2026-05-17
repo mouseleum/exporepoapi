@@ -66,6 +66,7 @@ body::after {
   margin: 0 auto;
   padding: 48px 32px 80px;
 }
+.wrap-wide { max-width: 1400px; }
 
 /* Header */
 header {
@@ -307,7 +308,7 @@ header {
   background: rgba(56,182,255,0.1); padding: 3px 10px;
   border-radius: 20px; margin-left: 10px;
 }
-.table-wrap { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
+.table-wrap { border: 1px solid var(--color-border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 thead tr { background: var(--color-surface2); border-bottom: 1px solid var(--color-border); }
 thead th {

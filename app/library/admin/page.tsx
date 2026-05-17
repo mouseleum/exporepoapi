@@ -134,7 +134,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="wrap">
+    <div className="wrap wrap-wide">
       <Header />
       <TopNav />
 
