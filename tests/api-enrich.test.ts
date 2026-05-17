@@ -1,13 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DELETE,
-  GET,
-  HEAD,
-  OPTIONS,
-  PATCH,
-  POST,
-  PUT,
-} from "@/app/api/enrich/route";
+import { POST } from "@/app/api/enrich/route";
 
 function buildReq(body: unknown): Request {
   return new Request("http://test/api/enrich", {
@@ -26,12 +18,6 @@ describe("/api/enrich", () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     delete process.env.PDL_API_KEY;
-  });
-
-  it("OPTIONS returns 200 with CORS headers", async () => {
-    const res = await OPTIONS();
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 
   it("returns 500 when PDL_API_KEY missing", async () => {
@@ -168,22 +154,13 @@ describe("/api/enrich", () => {
     });
   });
 
-  it.each([
-    ["GET", GET],
-    ["PUT", PUT],
-    ["DELETE", DELETE],
-    ["PATCH", PATCH],
-    ["HEAD", HEAD],
-  ])("%s returns 405 with error body and CORS headers", async (_name, fn) => {
-    const res = await fn();
-    expect(res.status).toBe(405);
-    expect(await res.json()).toEqual({ error: "Method not allowed" });
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(res.headers.get("Access-Control-Allow-Methods")).toBe(
-      "POST, OPTIONS",
-    );
-    expect(res.headers.get("Access-Control-Allow-Headers")).toBe(
-      "Content-Type",
-    );
+  it("rejects companies arrays larger than 500", async () => {
+    const tooMany = Array.from({ length: 501 }, (_, i) => ({
+      name: `Co${i}`,
+    }));
+    const res = await POST(buildReq({ companies: tooMany }));
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/too_many_companies/);
   });
 });

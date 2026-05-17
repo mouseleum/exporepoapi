@@ -1,13 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DELETE,
-  GET,
-  HEAD,
-  OPTIONS,
-  PATCH,
-  POST,
-  PUT,
-} from "@/app/api/score/route";
+import { POST } from "@/app/api/score/route";
 
 function buildReq(body: unknown): Request {
   return new Request("http://test/api/score", {
@@ -26,15 +18,6 @@ describe("/api/score", () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     delete process.env.ANTHROPIC_API_KEY;
-  });
-
-  it("OPTIONS returns 200 with CORS headers", async () => {
-    const res = await OPTIONS();
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(res.headers.get("Access-Control-Allow-Methods")).toBe(
-      "POST, OPTIONS",
-    );
   });
 
   it("returns 500 when ANTHROPIC_API_KEY missing", async () => {
@@ -139,22 +122,40 @@ describe("/api/score", () => {
     expect(await res.json()).toEqual({ error: "Network down" });
   });
 
-  it.each([
-    ["GET", GET],
-    ["PUT", PUT],
-    ["DELETE", DELETE],
-    ["PATCH", PATCH],
-    ["HEAD", HEAD],
-  ])("%s returns 405 with error body and CORS headers", async (_name, fn) => {
-    const res = await fn();
-    expect(res.status).toBe(405);
-    expect(await res.json()).toEqual({ error: "Method not allowed" });
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(res.headers.get("Access-Control-Allow-Methods")).toBe(
-      "POST, OPTIONS",
+  it("rejects a disallowed model", async () => {
+    const res = await POST(
+      buildReq({ prompt: "hi", model: "claude-opus-4-7" }),
     );
-    expect(res.headers.get("Access-Control-Allow-Headers")).toBe(
-      "Content-Type",
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "model_not_allowed: claude-opus-4-7",
+    });
+  });
+
+  it("rejects a disallowed tool type", async () => {
+    const res = await POST(
+      buildReq({
+        prompt: "hi",
+        tools: [{ type: "computer_use_99999999", name: "shell" }],
+      }),
     );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "tool_type_not_allowed: computer_use_99999999",
+    });
+  });
+
+  it("rejects prompts above the 200KB cap", async () => {
+    const res = await POST(
+      buildReq({ prompt: "x".repeat(200_001) }),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Invalid request body");
+  });
+
+  it("rejects max_tokens above 8000", async () => {
+    const res = await POST(buildReq({ prompt: "hi", max_tokens: 9000 }));
+    expect(res.status).toBe(400);
   });
 });

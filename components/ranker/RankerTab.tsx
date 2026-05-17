@@ -2,6 +2,7 @@
 
 import { useReducer, useRef } from "react";
 import { parseCSV } from "@/lib/csv";
+import { csvEscape } from "@/lib/csv-escape";
 import { guessAllColumns } from "@/lib/columns";
 import { parseSpreadsheet } from "@/lib/xlsx";
 import { chunkText, extractPdfText } from "@/lib/pdf";
@@ -115,10 +116,6 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-function csvEscape(v: string | number | null): string {
-  if (v === null) return "";
-  return String(v);
-}
 
 export function RankerTab() {
   const [state, dispatch] = useReducer(reducer, initialState);

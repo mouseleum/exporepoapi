@@ -29,6 +29,7 @@ import {
   type FilterTag,
 } from "@/lib/library/filters";
 import { formatRevenueUsd } from "@/lib/library/format";
+import { csvEscape } from "@/lib/csv-escape";
 import type {
   EventListItem,
   LibraryExhibitor,
@@ -156,10 +157,6 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-function csvEscape(v: string | number | null): string {
-  if (v === null) return "";
-  return String(v);
-}
 
 export default function LibraryPage() {
   const [state, dispatch] = useReducer(reducer, initialState);

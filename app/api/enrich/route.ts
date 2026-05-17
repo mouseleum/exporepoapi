@@ -1,13 +1,18 @@
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { corsPreflight, jsonWithCors, methodNotAllowed } from "@/lib/cors";
+
+// Hard cap to bound damage from a misbehaving (or malicious) client.
+// PDL is currently parked behind NEXT_PUBLIC_PDL_ENABLED so this is mostly
+// belt-and-braces, but it's cheap to enforce.
+const MAX_COMPANIES_PER_REQUEST = 500;
 
 const CompanyInputSchema = z.object({
-  name: z.string().min(1),
-  country: z.string().optional(),
+  name: z.string().min(1).max(500),
+  country: z.string().max(120).optional(),
 });
 
 const EnrichRequestSchema = z.object({
-  companies: z.array(CompanyInputSchema).min(1),
+  companies: z.array(CompanyInputSchema).min(1).max(MAX_COMPANIES_PER_REQUEST),
 });
 
 type CompanyInput = z.infer<typeof CompanyInputSchema>;
@@ -35,32 +40,38 @@ const PDL_URL = "https://api.peopledatalabs.com/v5/company/enrich";
 const BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 200;
 
-export async function OPTIONS(): Promise<Response> {
-  return corsPreflight();
-}
-
-export const GET = methodNotAllowed;
-export const PUT = methodNotAllowed;
-export const DELETE = methodNotAllowed;
-export const PATCH = methodNotAllowed;
-export const HEAD = methodNotAllowed;
-
 export async function POST(req: Request): Promise<Response> {
   const apiKey = process.env.PDL_API_KEY;
   if (!apiKey) {
-    return jsonWithCors({ error: "PDL_API_KEY not configured" }, 500);
+    return NextResponse.json(
+      { error: "PDL_API_KEY not configured" },
+      { status: 500 },
+    );
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return jsonWithCors({ error: "Missing companies array" }, 400);
+    return NextResponse.json(
+      { error: "Missing companies array" },
+      { status: 400 },
+    );
   }
 
   const parsed = EnrichRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return jsonWithCors({ error: "Missing companies array" }, 400);
+    const tooMany = parsed.error.issues.some(
+      (i) => i.path[0] === "companies" && i.code === "too_big",
+    );
+    return NextResponse.json(
+      {
+        error: tooMany
+          ? `too_many_companies: max ${MAX_COMPANIES_PER_REQUEST} per request`
+          : "Missing companies array",
+      },
+      { status: 400 },
+    );
   }
 
   const { companies } = parsed.data;
@@ -91,7 +102,7 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  return jsonWithCors({
+  return NextResponse.json({
     results,
     quota_exhausted: !!quotaExhausted,
     quota_message: quotaExhausted?.message,
