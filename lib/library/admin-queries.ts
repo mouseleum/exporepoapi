@@ -111,7 +111,13 @@ export async function createEvent(
     .select("id")
     .single();
   if (error || !data) {
-    throw new Error(`createEvent: ${error?.message ?? "no row returned"}`);
+    const msg = error?.message ?? "no row returned";
+    if (error?.code === "23505" || /duplicate key|already exists/i.test(msg)) {
+      throw new Error(
+        `Slug '${input.slug}' already exists — edit/fetch the existing row instead of adding a new one.`,
+      );
+    }
+    throw new Error(`createEvent: ${msg}`);
   }
   return { id: data.id as string };
 }
