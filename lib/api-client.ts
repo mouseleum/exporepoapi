@@ -61,9 +61,15 @@ export function extractTextFromAnthropic(res: AnthropicResponse): string {
     .join("");
 }
 
+export type EnrichBatchResult = {
+  results: EnrichedCompany[];
+  quotaExhausted?: boolean;
+  quotaMessage?: string;
+};
+
 export async function enrichCompanies(
   companies: { name: string; country?: string }[],
-): Promise<EnrichedCompany[]> {
+): Promise<EnrichBatchResult> {
   try {
     const res = await fetch("/api/enrich", {
       method: "POST",
@@ -73,9 +79,13 @@ export async function enrichCompanies(
     if (!res.ok) throw new Error("Enrichment error " + res.status);
     const json: unknown = await res.json();
     const parsed = EnrichResponseSchema.parse(json);
-    return parsed.results;
+    return {
+      results: parsed.results,
+      quotaExhausted: parsed.quota_exhausted,
+      quotaMessage: parsed.quota_message,
+    };
   } catch (err) {
     console.error("Enrichment failed:", err);
-    return [];
+    return { results: [] };
   }
 }

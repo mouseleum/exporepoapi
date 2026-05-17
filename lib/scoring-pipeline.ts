@@ -82,9 +82,19 @@ export async function runScoringPipeline(
       )}/${toEnrich.length})`,
     });
     try {
-      const results = await enrichCompanies(batch);
+      const { results, quotaExhausted, quotaMessage } =
+        await enrichCompanies(batch);
       for (const r of results) {
         if (r.matched) enrichedMap[nameKey(r.name)] = r;
+      }
+      if (quotaExhausted) {
+        const reason =
+          quotaMessage ?? "PDL quota exhausted — skipping further enrichment";
+        callbacks.onStatus({
+          kind: "info",
+          message: `⚠ ${reason} (scoring will continue with Apollo matches only)`,
+        });
+        break;
       }
     } catch {
       /* continue without enrichment */

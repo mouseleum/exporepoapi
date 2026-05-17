@@ -26,6 +26,11 @@ type EnrichResult =
     }
   | { name: string; matched: false };
 
+type EnrichOneOutcome = {
+  result: EnrichResult;
+  quotaExhausted?: { message: string };
+};
+
 const PDL_URL = "https://api.peopledatalabs.com/v5/company/enrich";
 const BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 200;
@@ -60,26 +65,43 @@ export async function POST(req: Request): Promise<Response> {
 
   const { companies } = parsed.data;
   const results: EnrichResult[] = [];
+  let quotaExhausted: { message: string } | undefined;
 
   for (let i = 0; i < companies.length; i += BATCH_SIZE) {
+    if (quotaExhausted) {
+      // Once PDL says "all matches used", every following call returns the
+      // same 402 — emit unmatched placeholders without spending the rest of
+      // the round trips.
+      for (const c of companies.slice(i)) {
+        results.push({ name: c.name, matched: false });
+      }
+      break;
+    }
     const batch = companies.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.all(
+    const outcomes = await Promise.all(
       batch.map((c) => enrichOne(c, apiKey)),
     );
-    results.push(...batchResults);
+    for (const o of outcomes) {
+      results.push(o.result);
+      if (o.quotaExhausted && !quotaExhausted) quotaExhausted = o.quotaExhausted;
+    }
 
     if (i + BATCH_SIZE < companies.length) {
       await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 
-  return jsonWithCors({ results });
+  return jsonWithCors({
+    results,
+    quota_exhausted: !!quotaExhausted,
+    quota_message: quotaExhausted?.message,
+  });
 }
 
 async function enrichOne(
   company: CompanyInput,
   apiKey: string,
-): Promise<EnrichResult> {
+): Promise<EnrichOneOutcome> {
   const params = new URLSearchParams({
     name: company.name,
     api_key: apiKey,
@@ -93,22 +115,42 @@ async function enrichOne(
     });
 
     if (response.status !== 200) {
-      return { name: company.name, matched: false };
+      // 402 with "all matches used" means the free-tier lifetime quota is
+      // gone. 429 means the per-minute budget is gone. Both are fatal for the
+      // rest of this run — bubble up so the caller can stop early.
+      if (response.status === 402 || response.status === 429) {
+        let message = `PDL HTTP ${response.status}`;
+        try {
+          const body = (await response.json()) as {
+            error?: { message?: string };
+          };
+          if (body.error?.message) message = body.error.message;
+        } catch {
+          /* leave the default message */
+        }
+        return {
+          result: { name: company.name, matched: false },
+          quotaExhausted: { message },
+        };
+      }
+      return { result: { name: company.name, matched: false } };
     }
 
     const data = (await response.json()) as Record<string, unknown>;
     return {
-      name: company.name,
-      matched: true,
-      employee_count: (data.employee_count as number | null) ?? null,
-      employee_range: (data.size as string | null) ?? null,
-      industry: (data.industry as string | null) ?? null,
-      revenue_range: (data.inferred_revenue as string | null) ?? null,
-      founded: (data.founded as number | null) ?? null,
-      linkedin_url: (data.linkedin_url as string | null) ?? null,
-      tags: (data.tags as string[] | undefined) ?? [],
+      result: {
+        name: company.name,
+        matched: true,
+        employee_count: (data.employee_count as number | null) ?? null,
+        employee_range: (data.size as string | null) ?? null,
+        industry: (data.industry as string | null) ?? null,
+        revenue_range: (data.inferred_revenue as string | null) ?? null,
+        founded: (data.founded as number | null) ?? null,
+        linkedin_url: (data.linkedin_url as string | null) ?? null,
+        tags: (data.tags as string[] | undefined) ?? [],
+      },
     };
   } catch {
-    return { name: company.name, matched: false };
+    return { result: { name: company.name, matched: false } };
   }
 }

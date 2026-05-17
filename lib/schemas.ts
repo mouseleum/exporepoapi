@@ -33,6 +33,8 @@ export const EnrichResultSchema = z.union([
 
 export const EnrichResponseSchema = z.object({
   results: z.array(EnrichResultSchema),
+  quota_exhausted: z.boolean().optional(),
+  quota_message: z.string().optional(),
 });
 
 export const RankedItemSchema = z.object({
