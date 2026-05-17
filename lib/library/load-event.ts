@@ -10,7 +10,12 @@ export type LoadEventResult = {
   fetched: number;
   upserted: number;
   dupes: number;
+  people_upserted?: number;
   elapsed_ms: number;
+};
+
+export type LoadEventOptions = {
+  includePeople?: boolean;
 };
 
 export type EventRow = {
@@ -51,12 +56,16 @@ export async function loadEventForRow(
   factories: Record<string, AdapterFactory> = ADAPTER_FACTORIES,
 ): Promise<LoadEventResult> {
   const adapter = buildAdapterForRow(row, factories);
-  return loadEventForAdapter(adapter, supabase);
+  const cfg = (row.adapter_config ?? {}) as { includePeople?: boolean };
+  return loadEventForAdapter(adapter, supabase, {
+    includePeople: !!cfg.includePeople,
+  });
 }
 
 export async function loadEventForAdapter(
   adapter: Adapter,
   supabase: SupabaseClient,
+  options: LoadEventOptions = {},
 ): Promise<LoadEventResult> {
   const start = Date.now();
 
@@ -91,6 +100,7 @@ export async function loadEventForAdapter(
     country: string | null;
     hall: string | null;
     booth: string | null;
+    source_id: string | null;
   }> = [];
   let dupes = 0;
   for (const x of exhibitors) {
@@ -107,6 +117,7 @@ export async function loadEventForAdapter(
       country: x.country ?? null,
       hall: x.hall ?? null,
       booth: x.booth ?? null,
+      source_id: x.source_id ?? null,
     });
   }
 
@@ -124,11 +135,90 @@ export async function loadEventForAdapter(
     upserted += batch.length;
   }
 
+  let people_upserted: number | undefined;
+  if (options.includePeople && adapter.fetchPeople) {
+    people_upserted = await loadPeopleForEvent(
+      eventId,
+      adapter,
+      rows
+        .map((r) => r.source_id)
+        .filter((id): id is string => !!id),
+      supabase,
+    );
+  }
+
   return {
     slug: adapter.meta.slug,
     fetched: exhibitors.length,
     upserted,
     dupes,
+    people_upserted,
     elapsed_ms: Date.now() - start,
   };
+}
+
+async function loadPeopleForEvent(
+  eventId: string,
+  adapter: Adapter,
+  exhibitorSourceIds: string[],
+  supabase: SupabaseClient,
+): Promise<number> {
+  if (!adapter.fetchPeople || exhibitorSourceIds.length === 0) return 0;
+
+  // Map each source_id → event_exhibitor.id so people FK back cleanly.
+  const { data: exhRows, error: exhErr } = await supabase
+    .from("event_exhibitors")
+    .select("id, source_id")
+    .eq("event_id", eventId)
+    .not("source_id", "is", null);
+  if (exhErr) {
+    throw new Error(
+      `event_exhibitors lookup failed for ${adapter.meta.slug}: ${exhErr.message}`,
+    );
+  }
+  const idBySourceId = new Map<string, string>();
+  for (const r of exhRows ?? []) {
+    if (r.source_id) idBySourceId.set(r.source_id as string, r.id as string);
+  }
+
+  const people = await adapter.fetchPeople(exhibitorSourceIds);
+  const peopleRows: Array<{
+    event_exhibitor_id: string;
+    source_person_id: string | null;
+    raw_name: string;
+    first_name: string | null;
+    last_name: string | null;
+    job_title: string | null;
+    organization: string | null;
+    photo_url: string | null;
+  }> = [];
+  for (const p of people) {
+    const exhId = idBySourceId.get(p.source_exhibitor_id);
+    if (!exhId) continue;
+    peopleRows.push({
+      event_exhibitor_id: exhId,
+      source_person_id: p.source_person_id ?? null,
+      raw_name: p.raw_name,
+      first_name: p.first_name ?? null,
+      last_name: p.last_name ?? null,
+      job_title: p.job_title ?? null,
+      organization: p.organization ?? null,
+      photo_url: p.photo_url ?? null,
+    });
+  }
+
+  let upserted = 0;
+  for (let i = 0; i < peopleRows.length; i += BATCH_SIZE) {
+    const batch = peopleRows.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase
+      .from("event_exhibitor_people")
+      .upsert(batch, { onConflict: "event_exhibitor_id,source_person_id" });
+    if (error) {
+      throw new Error(
+        `event_exhibitor_people upsert failed for ${adapter.meta.slug}: ${error.message}`,
+      );
+    }
+    upserted += batch.length;
+  }
+  return upserted;
 }

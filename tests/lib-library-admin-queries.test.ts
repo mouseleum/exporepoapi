@@ -20,7 +20,11 @@ type DbEvent = {
   scraped_at: string | null;
 };
 
-function makeListSupabase(events: DbEvent[], counts: Record<string, number> = {}) {
+function makeListSupabase(
+  events: DbEvent[],
+  counts: Record<string, number> = {},
+  peopleCounts: Record<string, number> = {},
+) {
   const eventsTable = {
     select: vi.fn(() => ({
       order: vi.fn(() => ({
@@ -36,10 +40,19 @@ function makeListSupabase(events: DbEvent[], counts: Record<string, number> = {}
       })),
     })),
   };
+  const peopleTable = {
+    select: vi.fn(() => ({
+      eq: vi.fn(async (_col: string, eventId: string) => ({
+        count: peopleCounts[eventId] ?? 0,
+        error: null,
+      })),
+    })),
+  };
   return {
     from: vi.fn((table: string) => {
       if (table === "events") return eventsTable;
       if (table === "event_exhibitors") return eeTable;
+      if (table === "event_exhibitor_people") return peopleTable;
       throw new Error(`unexpected table: ${table}`);
     }),
   } as unknown as SupabaseClient;
@@ -67,6 +80,7 @@ describe("listAllAdminEvents", () => {
         },
       ],
       { e1: 2901 },
+      { e1: 174 },
     );
     const out = await listAllAdminEvents(supabase);
     expect(out).toEqual([
@@ -81,6 +95,7 @@ describe("listAllAdminEvents", () => {
         romify_attending: true,
         scraped_at: "2026-05-01T00:00:00Z",
         exhibitor_count: 2901,
+        people_count: 174,
       },
     ]);
   });

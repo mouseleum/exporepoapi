@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseNodes, swapcardFactory } from "../lib/adapters/swapcard";
+import { parseNodes, parsePeople, swapcardFactory } from "../lib/adapters/swapcard";
 import type { EventMeta } from "../lib/adapters/types";
 
 const META: EventMeta = {
@@ -29,9 +29,9 @@ describe("swapcard adapter — parseNodes()", () => {
       { id: "3", name: "Online Co", withEvent: { booth: null } },
     ]);
     expect(rows).toEqual([
-      { raw_name: "Acme", country: null, hall: null, booth: "A12" },
-      { raw_name: "Beta", country: null, hall: null, booth: "B07" },
-      { raw_name: "Online Co", country: null, hall: null, booth: null },
+      { raw_name: "Acme", country: null, hall: null, booth: "A12", source_id: "1" },
+      { raw_name: "Beta", country: null, hall: null, booth: "B07", source_id: "2" },
+      { raw_name: "Online Co", country: null, hall: null, booth: null, source_id: "3" },
     ]);
   });
 
@@ -42,7 +42,7 @@ describe("swapcard adapter — parseNodes()", () => {
       { id: "3", name: "Real Co", withEvent: { booth: "C9" } },
     ]);
     expect(rows).toEqual([
-      { raw_name: "Real Co", country: null, hall: null, booth: "C9" },
+      { raw_name: "Real Co", country: null, hall: null, booth: "C9", source_id: "3" },
     ]);
   });
 
@@ -291,6 +291,149 @@ describe("swapcard adapter — fetch()", () => {
     });
     const out = await adapter.fetch();
     expect(out).toHaveLength(50);
+  });
+});
+
+describe("swapcard adapter — parsePeople()", () => {
+  it("turns Core_EventPerson nodes into RawPerson rows", () => {
+    const rows = parsePeople("EXH1", [
+      {
+        id: "P1",
+        firstName: "Anders",
+        lastName: "Bergdahl",
+        jobTitle: "Sales Manager",
+        organization: "ABB  AB",
+        photoUrl: "https://img/x.png",
+      },
+      {
+        id: "P2",
+        firstName: "Anna",
+        lastName: "",
+        jobTitle: null,
+        organization: "ABB",
+        photoUrl: null,
+      },
+    ]);
+    expect(rows).toEqual([
+      {
+        source_exhibitor_id: "EXH1",
+        source_person_id: "P1",
+        raw_name: "Anders Bergdahl",
+        first_name: "Anders",
+        last_name: "Bergdahl",
+        job_title: "Sales Manager",
+        organization: "ABB  AB",
+        photo_url: "https://img/x.png",
+      },
+      {
+        source_exhibitor_id: "EXH1",
+        source_person_id: "P2",
+        raw_name: "Anna",
+        first_name: "Anna",
+        last_name: null,
+        job_title: null,
+        organization: "ABB",
+        photo_url: null,
+      },
+    ]);
+  });
+
+  it("skips entries with no first or last name", () => {
+    const rows = parsePeople("EXH1", [
+      { id: "P1", firstName: "", lastName: "" },
+      { id: "P2", firstName: " ", lastName: null },
+    ]);
+    expect(rows).toEqual([]);
+  });
+});
+
+describe("swapcard adapter — fetchPeople()", () => {
+  function peopleBody(opts: {
+    nodes: Array<{ id: string; firstName: string; lastName: string; jobTitle?: string }>;
+  }) {
+    return [
+      {
+        data: {
+          members: {
+            nodes: opts.nodes,
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
+      },
+    ];
+  }
+
+  it("calls EventExhibitorDetailsViewQuery per source id and flattens results", async () => {
+    const fn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify(
+            peopleBody({
+              nodes: [
+                { id: "P1", firstName: "Anders", lastName: "Bergdahl", jobTitle: "Sales" },
+              ],
+            }),
+          ),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify(
+            peopleBody({
+              nodes: [
+                { id: "P2", firstName: "Beth", lastName: "Smith", jobTitle: "VP" },
+              ],
+            }),
+          ),
+      });
+    vi.stubGlobal("fetch", fn);
+    const adapter = swapcardFactory(META, CONFIG);
+    const out = await adapter.fetchPeople!(["EXH1", "EXH2"]);
+    expect(out).toHaveLength(2);
+    const names = out.map((p) => p.raw_name).sort();
+    expect(names).toEqual(["Anders Bergdahl", "Beth Smith"]);
+    expect(fn).toHaveBeenCalledTimes(2);
+    const bodies = (
+      fn.mock.calls as unknown as Array<[string, { body: string }]>
+    ).map((c) => JSON.parse(c[1].body)[0]);
+    expect(bodies[0].operationName).toBe("EventExhibitorDetailsViewQuery");
+    expect(bodies[0].extensions.persistedQuery.sha256Hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(bodies[0].variables.exhibitorId).toMatch(/^EXH/);
+  });
+
+  it("returns [] when called with no exhibitor ids", async () => {
+    const adapter = swapcardFactory(META, CONFIG);
+    const out = await adapter.fetchPeople!([]);
+    expect(out).toEqual([]);
+  });
+
+  it("throws when the people hash is rejected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify([
+            {
+              errors: [
+                {
+                  message: "PersistedQueryNotFound",
+                  extensions: { code: "PERSISTED_QUERY_NOT_FOUND" },
+                },
+              ],
+            },
+          ]),
+      })),
+    );
+    const adapter = swapcardFactory(META, CONFIG);
+    await expect(adapter.fetchPeople!(["EXH1"])).rejects.toThrow(
+      /people query hash rejected/,
+    );
   });
 });
 

@@ -54,6 +54,7 @@ export function EventAdminTable({
             <th>Family</th>
             <th>Config</th>
             <th>Exhibitors</th>
+            <th>People</th>
             <th>Last scraped</th>
             <th>My company</th>
             <th></th>
@@ -70,6 +71,7 @@ export function EventAdminTable({
                 <td className="hall-cell">{r.source}</td>
                 <td className="industry-cell">{formatConfig(r.adapter_config)}</td>
                 <td className="hall-cell">{r.exhibitor_count}</td>
+                <td className="hall-cell">{r.people_count || "—"}</td>
                 <td className="hall-cell">{formatScraped(r.scraped_at)}</td>
                 <td>
                   <input

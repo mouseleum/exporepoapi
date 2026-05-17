@@ -69,6 +69,7 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
   const [viewId, setViewId] = useState("");
   const [eventId, setEventId] = useState("");
   const [persistedQueryHash, setPersistedQueryHash] = useState("");
+  const [includePeople, setIncludePeople] = useState(false);
 
   const [formError, setFormError] = useState<string | null>(null);
   const [inferNote, setInferNote] = useState<string | null>(null);
@@ -100,6 +101,7 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
     setViewId("");
     setEventId("");
     setPersistedQueryHash("");
+    setIncludePeople(false);
     setRomifyAttending(true);
     setFormError(null);
     setInferNote(null);
@@ -163,6 +165,7 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
       if (eventId.trim()) cfg.eventId = eventId.trim();
       if (persistedQueryHash.trim())
         cfg.persistedQueryHash = persistedQueryHash.trim();
+      if (includePeople) cfg.includePeople = true;
     }
     if (minExhibitors.trim() !== "") {
       const n = Number(minExhibitors);
@@ -390,6 +393,15 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
                 placeholder="leave blank to use default"
                 disabled={busy}
               />
+            </label>
+            <label className="event-add-field event-add-checkbox">
+              <input
+                type="checkbox"
+                checked={includePeople}
+                onChange={(e) => setIncludePeople(e.target.checked)}
+                disabled={busy}
+              />
+              <span>Also fetch booth people (~1 call per exhibitor)</span>
             </label>
           </>
         )}

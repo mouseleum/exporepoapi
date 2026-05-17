@@ -14,6 +14,7 @@ export type AdminEventRow = {
   romify_attending: boolean;
   scraped_at: string | null;
   exhibitor_count: number;
+  people_count: number;
 };
 
 export type CreateEventInput = {
@@ -51,14 +52,25 @@ export async function listAllAdminEvents(
 
   const counts = await Promise.all(
     events.map(async (e) => {
-      const { count } = await supabase
-        .from("event_exhibitors")
-        .select("*", { count: "exact", head: true })
-        .eq("event_id", e.id as string);
-      return [e.id as string, count ?? 0] as const;
+      const id = e.id as string;
+      const [exhRes, peopleRes] = await Promise.all([
+        supabase
+          .from("event_exhibitors")
+          .select("*", { count: "exact", head: true })
+          .eq("event_id", id),
+        supabase
+          .from("event_exhibitor_people")
+          .select("event_exhibitor_id, event_exhibitors!inner(event_id)", {
+            count: "exact",
+            head: true,
+          })
+          .eq("event_exhibitors.event_id", id),
+      ]);
+      return [id, exhRes.count ?? 0, peopleRes.count ?? 0] as const;
     }),
   );
-  const countMap = new Map(counts);
+  const exhMap = new Map(counts.map((c) => [c[0], c[1]]));
+  const peopleMap = new Map(counts.map((c) => [c[0], c[2]]));
 
   return events.map((e) => ({
     id: e.id as string,
@@ -70,7 +82,8 @@ export async function listAllAdminEvents(
     adapter_config: e.adapter_config ?? {},
     romify_attending: !!e.romify_attending,
     scraped_at: (e.scraped_at as string | null) ?? null,
-    exhibitor_count: countMap.get(e.id as string) ?? 0,
+    exhibitor_count: exhMap.get(e.id as string) ?? 0,
+    people_count: peopleMap.get(e.id as string) ?? 0,
   }));
 }
 
