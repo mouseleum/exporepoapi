@@ -2,6 +2,7 @@
 
 import type { LibraryExhibitor, TagValue } from "@/lib/library/queries";
 import { formatRevenueUsd } from "@/lib/library/format";
+import { buildExhibitorsCsv } from "@/lib/library/export-csv";
 import { TagPicker } from "./TagPicker";
 
 type ExhibitorPreviewProps = {
@@ -10,6 +11,7 @@ type ExhibitorPreviewProps = {
   onTagChange?: (name_normalized: string, tag: TagValue | null) => void;
   onEdit?: (exhibitor: LibraryExhibitor) => void;
   filterChildren?: React.ReactNode;
+  exportFileBase?: string;
 };
 
 function formatEmployees(n: number | null): string {
@@ -29,11 +31,22 @@ export function ExhibitorPreview({
   onTagChange,
   onEdit,
   filterChildren,
+  exportFileBase,
 }: ExhibitorPreviewProps) {
   const total = exhibitors.length;
   const matched = exhibitors.filter((e) => e.apollo_matched).length;
   const rows = visible ?? exhibitors;
   const filtered = rows.length !== total;
+
+  const downloadAll = () => {
+    if (exhibitors.length === 0) return;
+    const csv = buildExhibitorsCsv(exhibitors);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `mikaels_${exportFileBase ?? "library"}_all${exhibitors.length}.csv`;
+    a.click();
+  };
 
   return (
     <div className="exhibitor-preview">
@@ -43,6 +56,16 @@ export function ExhibitorPreview({
           {filtered ? `${rows.length} of ${total} · ` : ""}
           {matched} / {total} enriched
         </span>
+        {exhibitors.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-secondary exhibitor-preview-download"
+            onClick={downloadAll}
+            title="Download every exhibitor in this event as CSV"
+          >
+            Download all ({total}) CSV
+          </button>
+        )}
       </div>
       {filterChildren}
       {rows.length === 0 ? (

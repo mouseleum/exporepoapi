@@ -453,6 +453,7 @@ export default function LibraryPage() {
           visible={visibleExhibitors}
           onTagChange={handleTagChange}
           onEdit={(ex) => setEditingExhibitor(ex)}
+          exportFileBase={selectedEvent?.slug}
           filterChildren={
             <FilterBar
               filter={state.filter}
