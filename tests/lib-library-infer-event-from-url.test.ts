@@ -90,25 +90,86 @@ describe("inferEventFromUrl — non-network families", () => {
     expect(out?.adapter_config).toEqual({ expoKey: "mbsfestival" });
   });
 
-  it("solar-promotion: matches /exhibitorlist on any sister host", async () => {
-    for (const url of [
-      "https://www.thesmartere.de/exhibitorlist",
-      "https://www.intersolar.de/exhibitorlist",
-      "https://www.ees-europe.com/exhibitorlist",
-      "https://www.powertodrive.de/exhibitorlist",
-      "https://www.em-power.eu/exhibitorlist",
-    ]) {
-      const out = await inferEventFromUrl(url);
-      expect(out?.family).toBe("solar-promotion");
-      expect(out?.adapter_config).toEqual({});
-    }
-  });
-
   it("solar-promotion: ignores other paths on the sister hosts", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 200 })));
     const out = await inferEventFromUrl(
       "https://www.thesmartere.de/for-exhibitors",
     );
     expect(out).toBeNull();
+  });
+});
+
+describe("inferEventFromUrl — solar-promotion", () => {
+  const HERO_HTML = (year: string, name: string) => `<!doctype html>
+<html><body>
+  <h1>Exhibitor List</h1>
+  <p>${name} — June 23–25, ${year}, Messe München.</p>
+  <p>Discover the exhibitors presenting their products and services at ${name} ${year}.</p>
+</body></html>`;
+
+  it("maps each sister host to its show name", async () => {
+    const expectations: Array<[string, string]> = [
+      ["https://www.thesmartere.de/exhibitorlist", "The smarter E Europe"],
+      ["https://www.intersolar.de/exhibitorlist", "Intersolar Europe"],
+      ["https://www.ees-europe.com/exhibitorlist", "ees Europe"],
+      ["https://www.powertodrive.de/exhibitorlist", "Power2Drive Europe"],
+      ["https://www.em-power.eu/exhibitorlist", "EM-Power Europe"],
+    ];
+    for (const [u, name] of expectations) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response(HERO_HTML("2026", name), { status: 200 })),
+      );
+      const out = await inferEventFromUrl(u);
+      expect(out?.family).toBe("solar-promotion");
+      expect(out?.suggestedName).toBe(name);
+      expect(out?.suggestedYear).toBe(2026);
+      expect(out?.adapter_config).toEqual({});
+    }
+  });
+
+  it("picks up the year from a date range in the page", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            `<html><body><p>June 22–23, 2027 at Messe München.</p></body></html>`,
+            { status: 200 },
+          ),
+      ),
+    );
+    const out = await inferEventFromUrl(
+      "https://www.em-power.eu/exhibitorlist",
+    );
+    expect(out?.suggestedYear).toBe(2027);
+  });
+
+  it("returns the show name even when the page fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 503 })),
+    );
+    const out = await inferEventFromUrl(
+      "https://www.intersolar.de/exhibitorlist",
+    );
+    expect(out?.family).toBe("solar-promotion");
+    expect(out?.suggestedName).toBe("Intersolar Europe");
+    expect(out?.suggestedYear).toBeUndefined();
+  });
+
+  it("survives a network error during page fetch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    );
+    const out = await inferEventFromUrl(
+      "https://www.ees-europe.com/exhibitorlist",
+    );
+    expect(out?.family).toBe("solar-promotion");
+    expect(out?.suggestedName).toBe("ees Europe");
   });
 });
 

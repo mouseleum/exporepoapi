@@ -227,22 +227,88 @@ async function inferSwapcard(url: URL): Promise<InferredEvent | null> {
   };
 }
 
-function inferSolarPromotion(url: URL): InferredEvent | null {
+// Each host hosts exactly one canonical show; the page itself doesn't expose
+// the show name as a meta tag, so map it from the host directly.
+const SOLAR_PROMOTION_SHOWS: Array<{ hostPattern: RegExp; name: string }> = [
+  { hostPattern: /(^|\.)thesmartere\.de$/i, name: "The smarter E Europe" },
+  { hostPattern: /(^|\.)intersolar\.de$/i, name: "Intersolar Europe" },
+  { hostPattern: /(^|\.)ees-europe\.com$/i, name: "ees Europe" },
+  { hostPattern: /(^|\.)powertodrive\.de$/i, name: "Power2Drive Europe" },
+  { hostPattern: /(^|\.)em-power\.eu$/i, name: "EM-Power Europe" },
+];
+
+function solarPromotionShowName(host: string): string | undefined {
+  return SOLAR_PROMOTION_SHOWS.find((s) => s.hostPattern.test(host))?.name;
+}
+
+function isSolarPromotionListPath(pathname: string): boolean {
+  return /^\/(exhibitorlist|exhibitor-list|product-list)\/?$/.test(
+    pathname.toLowerCase(),
+  );
+}
+
+function inferSolarPromotionFromUrl(url: URL): InferredEvent | null {
   if (!isSolarPromotionHost(url.host)) return null;
-  // /exhibitorlist is the canonical landing page across all five sister sites
-  // (thesmartere.de, intersolar.de, ees-europe.com, powertodrive.de, em-power.eu).
-  // Adapter re-fetches the page on every run to harvest fresh menuPageId /
-  // menuPageTypes / csrfToken, so we don't need to capture them here.
-  const path = url.pathname.toLowerCase();
-  if (!/^\/(exhibitorlist|exhibitor-list|product-list)\/?$/.test(path)) {
-    return null;
-  }
+  if (!isSolarPromotionListPath(url.pathname)) return null;
   return {
     family: "solar-promotion",
     adapter_config: {},
     source_url: url.toString(),
+    suggestedName: solarPromotionShowName(url.host),
     suggestedYear: inferYearFromUrl(url),
   };
+}
+
+function pickSolarPromotionYear(
+  html: string,
+  showName: string | undefined,
+): number | undefined {
+  // Strategy 1: a date range like "June 23–25, 2026" (the page renders the
+  // event dates in a hero block on every sister site).
+  const dateRange = html.match(
+    /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b[^<]{1,40}\b(20\d{2})\b/i,
+  );
+  if (dateRange?.[1]) {
+    const y = Number(dateRange[1]);
+    if (Number.isInteger(y)) return y;
+  }
+  // Strategy 2: "<show name> <year>" appears in body copy on the list pages.
+  if (showName) {
+    const safe = showName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = html.match(new RegExp(`${safe}\\s+(20\\d{2})\\b`));
+    if (m?.[1]) {
+      const y = Number(m[1]);
+      if (Number.isInteger(y)) return y;
+    }
+  }
+  return undefined;
+}
+
+async function inferSolarPromotion(url: URL): Promise<InferredEvent | null> {
+  const base = inferSolarPromotionFromUrl(url);
+  if (!base) return null;
+  // If the URL already gives us the year we can skip the network round-trip.
+  if (base.suggestedYear) return base;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return base;
+    const html = await res.text();
+    const year = pickSolarPromotionYear(html, base.suggestedName);
+    if (year) return { ...base, suggestedYear: year };
+    return base;
+  } catch {
+    return base;
+  }
 }
 
 function findKnownIframeUrl(html: string, base: URL): string | null {
@@ -265,7 +331,7 @@ function findKnownIframeUrl(html: string, base: URL): string | null {
       inferExpoFp(abs) ||
       inferMapYourShow(abs) ||
       inferDimedis(abs) ||
-      inferSolarPromotion(abs) ||
+      inferSolarPromotionFromUrl(abs) ||
       inferSwapcardFromUrl(abs)
     ) {
       return abs.toString();
@@ -312,10 +378,10 @@ async function inferOnce(raw: string): Promise<InferredEvent | null> {
     inferCyberseceurope(url) ??
     inferExpoFp(url) ??
     inferMapYourShow(url) ??
-    inferDimedis(url) ??
-    inferSolarPromotion(url);
+    inferDimedis(url);
   if (syncMatch) return syncMatch;
   if (inferSwapcardFromUrl(url)) return inferSwapcard(url);
+  if (inferSolarPromotionFromUrl(url)) return inferSolarPromotion(url);
   return null;
 }
 
