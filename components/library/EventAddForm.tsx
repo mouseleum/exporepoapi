@@ -6,6 +6,7 @@ import { DimedisConfigSchema } from "@/lib/adapters/dimedis";
 import { MapYourShowConfigSchema } from "@/lib/adapters/mapyourshow";
 import { ExpoFpConfigSchema } from "@/lib/adapters/expofp";
 import { SwapcardConfigSchema } from "@/lib/adapters/swapcard";
+import { SolarPromotionConfigSchema } from "@/lib/adapters/solar-promotion";
 import type { CreateEventInput } from "@/lib/library/admin-queries";
 import type { InferredEvent } from "@/lib/library/infer-event-from-url";
 
@@ -14,7 +15,8 @@ type Family =
   | "cyberseceurope"
   | "mapyourshow"
   | "expofp"
-  | "swapcard";
+  | "swapcard"
+  | "solar-promotion";
 
 const FAMILY_LABELS: Record<Family, string> = {
   dimedis: "DIMEDIS Vis (interpack, drupa, medica, glasstec, boot, …)",
@@ -22,6 +24,8 @@ const FAMILY_LABELS: Record<Family, string> = {
   mapyourshow: "MapYourShow (Battery Show, NAB, IBC, …)",
   expofp: "ExpoFP (MBS Festival, …)",
   swapcard: "Swapcard (Vitafoods, …)",
+  "solar-promotion":
+    "Solar Promotion (the smarter E, Intersolar, ees, Power2Drive, EM-Power)",
 };
 
 const FAMILIES: Family[] = [
@@ -30,6 +34,7 @@ const FAMILIES: Family[] = [
   "mapyourshow",
   "expofp",
   "swapcard",
+  "solar-promotion",
 ];
 
 function slugify(name: string, year: number | null): string {
@@ -191,7 +196,9 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
             ? ExpoFpConfigSchema
             : family === "swapcard"
               ? SwapcardConfigSchema
-              : null;
+              : family === "solar-promotion"
+                ? SolarPromotionConfigSchema
+                : null;
     if (schema) {
       const parsed = schema.safeParse(adapterConfig);
       if (!parsed.success) {
@@ -300,7 +307,9 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
                     ? "https://app.expofp.com/home/<expoKey>"
                     : family === "swapcard"
                       ? "https://visitor.<show>.com/event/<slug>/exhibitors/<viewId>"
-                      : "https://www.example.com/vis/v1/en/directory/a"
+                      : family === "solar-promotion"
+                        ? "https://www.thesmartere.de/exhibitorlist"
+                        : "https://www.example.com/vis/v1/en/directory/a"
             }
             disabled={busy}
             required

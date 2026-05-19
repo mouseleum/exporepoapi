@@ -89,6 +89,27 @@ describe("inferEventFromUrl — non-network families", () => {
     expect(out?.family).toBe("expofp");
     expect(out?.adapter_config).toEqual({ expoKey: "mbsfestival" });
   });
+
+  it("solar-promotion: matches /exhibitorlist on any sister host", async () => {
+    for (const url of [
+      "https://www.thesmartere.de/exhibitorlist",
+      "https://www.intersolar.de/exhibitorlist",
+      "https://www.ees-europe.com/exhibitorlist",
+      "https://www.powertodrive.de/exhibitorlist",
+      "https://www.em-power.eu/exhibitorlist",
+    ]) {
+      const out = await inferEventFromUrl(url);
+      expect(out?.family).toBe("solar-promotion");
+      expect(out?.adapter_config).toEqual({});
+    }
+  });
+
+  it("solar-promotion: ignores other paths on the sister hosts", async () => {
+    const out = await inferEventFromUrl(
+      "https://www.thesmartere.de/for-exhibitors",
+    );
+    expect(out).toBeNull();
+  });
 });
 
 describe("inferEventFromUrl — swapcard", () => {

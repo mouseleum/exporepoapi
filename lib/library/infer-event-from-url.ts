@@ -1,5 +1,13 @@
+import { isSolarPromotionHost } from "@/lib/adapters/solar-promotion";
+
 export type InferredEvent = {
-  family: "dimedis" | "cyberseceurope" | "mapyourshow" | "expofp" | "swapcard";
+  family:
+    | "dimedis"
+    | "cyberseceurope"
+    | "mapyourshow"
+    | "expofp"
+    | "swapcard"
+    | "solar-promotion";
   adapter_config: Record<string, unknown>;
   source_url: string;
   suggestedName?: string;
@@ -219,6 +227,24 @@ async function inferSwapcard(url: URL): Promise<InferredEvent | null> {
   };
 }
 
+function inferSolarPromotion(url: URL): InferredEvent | null {
+  if (!isSolarPromotionHost(url.host)) return null;
+  // /exhibitorlist is the canonical landing page across all five sister sites
+  // (thesmartere.de, intersolar.de, ees-europe.com, powertodrive.de, em-power.eu).
+  // Adapter re-fetches the page on every run to harvest fresh menuPageId /
+  // menuPageTypes / csrfToken, so we don't need to capture them here.
+  const path = url.pathname.toLowerCase();
+  if (!/^\/(exhibitorlist|exhibitor-list|product-list)\/?$/.test(path)) {
+    return null;
+  }
+  return {
+    family: "solar-promotion",
+    adapter_config: {},
+    source_url: url.toString(),
+    suggestedYear: inferYearFromUrl(url),
+  };
+}
+
 function findKnownIframeUrl(html: string, base: URL): string | null {
   // Pull every iframe src and pick the first one that any of our detectors
   // already know how to handle. Keeps iframe-sniffing decoupled from the
@@ -239,6 +265,7 @@ function findKnownIframeUrl(html: string, base: URL): string | null {
       inferExpoFp(abs) ||
       inferMapYourShow(abs) ||
       inferDimedis(abs) ||
+      inferSolarPromotion(abs) ||
       inferSwapcardFromUrl(abs)
     ) {
       return abs.toString();
@@ -285,7 +312,8 @@ async function inferOnce(raw: string): Promise<InferredEvent | null> {
     inferCyberseceurope(url) ??
     inferExpoFp(url) ??
     inferMapYourShow(url) ??
-    inferDimedis(url);
+    inferDimedis(url) ??
+    inferSolarPromotion(url);
   if (syncMatch) return syncMatch;
   if (inferSwapcardFromUrl(url)) return inferSwapcard(url);
   return null;
