@@ -9,6 +9,10 @@ import { SwapcardConfigSchema } from "@/lib/adapters/swapcard";
 import { SolarPromotionConfigSchema } from "@/lib/adapters/solar-promotion";
 import type { CreateEventInput } from "@/lib/library/admin-queries";
 import type { InferredEvent } from "@/lib/library/infer-event-from-url";
+import {
+  isStaleDeploymentError,
+  STALE_DEPLOYMENT_MESSAGE,
+} from "@/lib/stale-deployment";
 
 type Family =
   | "dimedis"
@@ -150,8 +154,12 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
         );
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setInferNote(`Detect failed: ${msg}`);
+      if (isStaleDeploymentError(err)) {
+        setInferNote(`${STALE_DEPLOYMENT_MESSAGE} (Cmd/Ctrl+R)`);
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        setInferNote(`Detect failed: ${msg}`);
+      }
     } finally {
       setInferring(false);
     }

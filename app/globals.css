@@ -404,6 +404,9 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   font-size: 12px; color: var(--color-muted2);
 }
 .status-box.error { border-color: var(--color-danger); color: var(--color-danger); }
+.status-box.stale-deploy { border-color: var(--color-accent); color: var(--color-text); }
+.status-box.stale-deploy .status-inner { justify-content: space-between; }
+.status-box.stale-deploy .btn { flex-shrink: 0; }
 .status-inner { display: flex; align-items: center; gap: 10px; }
 .spinner {
   width: 14px; height: 14px;
