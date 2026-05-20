@@ -1,9 +1,28 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import type { LibraryExhibitor, TagValue } from "@/lib/library/queries";
 import { formatRevenueUsd } from "@/lib/library/format";
 import { buildExhibitorsCsv } from "@/lib/library/export-csv";
+import {
+  nextSort,
+  sortExhibitors,
+  type ExhibitorSort,
+  type ExhibitorSortKey,
+} from "@/lib/library/sort-exhibitors";
 import { TagPicker } from "./TagPicker";
+
+const COLUMNS: Array<{ key: ExhibitorSortKey; label: string }> = [
+  { key: "name", label: "Name" },
+  { key: "country", label: "Country" },
+  { key: "hall", label: "Hall" },
+  { key: "booth", label: "Booth" },
+  { key: "employees", label: "Employees" },
+  { key: "revenue", label: "Revenue" },
+  { key: "industry", label: "Industry" },
+  { key: "source", label: "Source" },
+  { key: "tag", label: "Tag" },
+];
 
 type ExhibitorPreviewProps = {
   exhibitors: LibraryExhibitor[];
@@ -35,8 +54,14 @@ export function ExhibitorPreview({
 }: ExhibitorPreviewProps) {
   const total = exhibitors.length;
   const matched = exhibitors.filter((e) => e.apollo_matched).length;
-  const rows = visible ?? exhibitors;
-  const filtered = rows.length !== total;
+  const filteredRows = visible ?? exhibitors;
+  const filtered = filteredRows.length !== total;
+
+  const [sort, setSort] = useState<ExhibitorSort | null>(null);
+  const rows = useMemo(
+    () => (sort ? sortExhibitors(filteredRows, sort) : filteredRows),
+    [filteredRows, sort],
+  );
 
   const downloadAll = () => {
     if (exhibitors.length === 0) return;
@@ -75,15 +100,26 @@ export function ExhibitorPreview({
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Country</th>
-              <th>Hall</th>
-              <th>Booth</th>
-              <th>Employees</th>
-              <th>Revenue</th>
-              <th>Industry</th>
-              <th>Source</th>
-              <th>Tag</th>
+              {COLUMNS.map((col) => {
+                const active = sort?.key === col.key;
+                return (
+                  <th key={col.key}>
+                    <button
+                      type="button"
+                      className={
+                        "th-sort" + (active ? " th-sort-active" : "")
+                      }
+                      onClick={() => setSort((s) => nextSort(s, col.key))}
+                      aria-label={`Sort by ${col.label}`}
+                    >
+                      {col.label}
+                      <span className="th-sort-caret">
+                        {active ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
