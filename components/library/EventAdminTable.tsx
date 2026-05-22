@@ -7,6 +7,7 @@ type Props = {
   rows: AdminEventRow[];
   onToggleRomify: (id: string, value: boolean) => Promise<void>;
   onTogglePeople: (id: string, value: boolean) => Promise<void>;
+  onToggleCountry: (id: string, value: boolean) => Promise<void>;
   onFetch: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
@@ -14,6 +15,11 @@ type Props = {
 function isPeopleEnabled(cfg: unknown): boolean {
   if (!cfg || typeof cfg !== "object") return false;
   return !!(cfg as { includePeople?: unknown }).includePeople;
+}
+
+function isCountryEnabled(cfg: unknown): boolean {
+  if (!cfg || typeof cfg !== "object") return false;
+  return !!(cfg as { includeCountry?: unknown }).includeCountry;
 }
 
 function formatScraped(iso: string | null): string {
@@ -32,6 +38,7 @@ export function EventAdminTable({
   rows,
   onToggleRomify,
   onTogglePeople,
+  onToggleCountry,
   onFetch,
   onDelete,
 }: Props) {
@@ -62,6 +69,7 @@ export function EventAdminTable({
             <th>Config</th>
             <th>Exhibitors</th>
             <th>People</th>
+            <th>Country</th>
             <th>Last scraped</th>
             <th>My company</th>
             <th></th>
@@ -98,6 +106,30 @@ export function EventAdminTable({
                         }
                       />
                       <span>{r.people_count || "—"}</span>
+                    </label>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="hall-cell">
+                  {r.source === "mapyourshow" ? (
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isCountryEnabled(r.adapter_config)}
+                        disabled={busy}
+                        onChange={(e) =>
+                          handle(r.id, () =>
+                            onToggleCountry(r.id, e.target.checked),
+                          )
+                        }
+                      />
                     </label>
                   ) : (
                     "—"

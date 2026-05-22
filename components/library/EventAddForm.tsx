@@ -72,6 +72,8 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
   const [domain, setDomain] = useState("");
   const [lang, setLang] = useState("");
   const [minExhibitors, setMinExhibitors] = useState("");
+  // mapyourshow
+  const [includeCountry, setIncludeCountry] = useState(false);
   // expofp
   const [expoKey, setExpoKey] = useState("");
   // swapcard
@@ -111,6 +113,7 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
     setEventId("");
     setPersistedQueryHash("");
     setIncludePeople(false);
+    setIncludeCountry(false);
     setRomifyAttending(true);
     setFormError(null);
     setInferNote(null);
@@ -171,6 +174,7 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
     if (family === "dimedis" || family === "mapyourshow") {
       if (domain.trim()) cfg.domain = domain.trim();
       if (family === "dimedis" && lang.trim()) cfg.lang = lang.trim();
+      if (family === "mapyourshow" && includeCountry) cfg.includeCountry = true;
     }
     if (family === "expofp" && expoKey.trim()) cfg.expoKey = expoKey.trim();
     if (family === "swapcard") {
@@ -358,6 +362,17 @@ export function EventAddForm({ onCreate, onInfer, busy }: Props) {
                   placeholder="en"
                   disabled={busy}
                 />
+              </label>
+            )}
+            {family === "mapyourshow" && (
+              <label className="event-add-field event-add-checkbox">
+                <input
+                  type="checkbox"
+                  checked={includeCountry}
+                  onChange={(e) => setIncludeCountry(e.target.checked)}
+                  disabled={busy}
+                />
+                <span>Also fetch country (~1 call per exhibitor)</span>
               </label>
             )}
           </>

@@ -98,6 +98,36 @@ export default function AdminPage() {
     }
   };
 
+  const handleToggleCountry = async (id: string, value: boolean) => {
+    const before = rows;
+    setRows((rs) =>
+      rs.map((r) => {
+        if (r.id !== id) return r;
+        const cfg = { ...((r.adapter_config as Record<string, unknown>) ?? {}) };
+        if (value) cfg.includeCountry = true;
+        else delete cfg.includeCountry;
+        return { ...r, adapter_config: cfg };
+      }),
+    );
+    try {
+      const row = before.find((r) => r.id === id);
+      const cfg = { ...((row?.adapter_config as Record<string, unknown>) ?? {}) };
+      if (value) cfg.includeCountry = true;
+      else delete cfg.includeCountry;
+      await updateEvent(id, { adapter_config: cfg });
+      setStatus({
+        kind: "info",
+        message: value
+          ? `✓ Country fetch enabled for ${row?.slug ?? id} — hit Fetch now`
+          : `✓ Country fetch disabled for ${row?.slug ?? id}`,
+      });
+    } catch (err) {
+      setRows(before);
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus({ kind: "error", message: "Toggle failed: " + message });
+    }
+  };
+
   const handleFetch = async (id: string) => {
     const row = rows.find((r) => r.id === id);
     setStatus({
@@ -172,6 +202,7 @@ export default function AdminPage() {
           rows={rows}
           onToggleRomify={handleToggleRomify}
           onTogglePeople={handleTogglePeople}
+          onToggleCountry={handleToggleCountry}
           onFetch={handleFetch}
           onDelete={handleDelete}
         />
