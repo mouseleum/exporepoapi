@@ -42,3 +42,39 @@ export function lookupInDB(
   return db.byRaw.get(key) ?? db.byNormalized.get(key) ?? null;
 }
 
+export type CompanyDbSyncInput = {
+  name: string;
+  country?: string | null;
+  employees?: number | null;
+  industry?: string | null;
+};
+
+export type CompanyDbSyncResult = {
+  added: number;
+  updated: number;
+  total: number;
+};
+
+export async function pushCompaniesToDb(
+  companies: CompanyDbSyncInput[],
+  source: string,
+): Promise<CompanyDbSyncResult> {
+  const res = await fetch(DB_URL + "/api/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ companies, source }),
+  });
+  if (!res.ok) throw new Error(`/api/sync ${res.status}: ${await res.text()}`);
+  const json = (await res.json()) as {
+    ok?: boolean;
+    added?: number;
+    updated?: number;
+    total?: number;
+  };
+  return {
+    added: json.added ?? 0,
+    updated: json.updated ?? 0,
+    total: json.total ?? 0,
+  };
+}
+

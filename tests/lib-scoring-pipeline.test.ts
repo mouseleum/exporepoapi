@@ -61,6 +61,14 @@ function setupFetchMocks(opts: FetchMockOpts) {
         text: () => Promise.resolve(""),
       };
     }
+    if (url.includes("company-db-agent.vercel.app/api/sync")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, added: 0, updated: 0, total: 0 }),
+        text: () => Promise.resolve(""),
+      };
+    }
     if (url.includes("/api/enrich")) {
       const enriched = (opts.pdl ?? []).map((p) =>
         p.matched
