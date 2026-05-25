@@ -15,8 +15,9 @@ type FilterKind = "all" | "missing" | "overrides" | string;
 
 function flag(country: string | null): string {
   if (!country || !/^[A-Z]{2}$/.test(country)) return "";
+  // Regional Indicator Symbol Letter A = U+1F1E6.
   return String.fromCodePoint(
-    ...[...country].map((c) => 0x1f1e0 + c.charCodeAt(0) - 65),
+    ...[...country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65),
   );
 }
 
