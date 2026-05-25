@@ -111,11 +111,24 @@ async function main(): Promise<void> {
   console.log("→ Applying…");
   for (let i = 0; i < updates.length; i++) {
     const u = updates[i]!;
-    const { error } = await supabase
-      .from("companies")
-      .update({ country: u.after })
-      .eq("id", u.id);
-    if (error) throw new Error(`update ${u.id}: ${error.message}`);
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const { error } = await supabase
+          .from("companies")
+          .update({ country: u.after })
+          .eq("id", u.id);
+        if (error) throw new Error(error.message);
+        lastErr = null;
+        break;
+      } catch (err) {
+        lastErr = err;
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+    if (lastErr) {
+      throw new Error(`update ${u.id} after retries: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+    }
     if ((i + 1) % 200 === 0 || i + 1 === updates.length) {
       console.log(`  ${i + 1}/${updates.length}`);
     }
