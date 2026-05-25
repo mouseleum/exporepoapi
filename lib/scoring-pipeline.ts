@@ -1,6 +1,6 @@
 import { syncCompaniesToDb } from "@/app/library/actions";
 import { enrichCompanies } from "./api-client";
-import { loadDB, lookupInDB, pushCompaniesToDb } from "./company-db";
+import { loadDB, lookupInDB } from "./company-db";
 import { scoreCompanies, type ScorableCompany } from "./scorer";
 import type {
   CountryWeights,
@@ -156,19 +156,9 @@ export async function runScoringPipeline(
     });
   }
 
-  try {
-    const cdbResult = await pushCompaniesToDb(syncPayload, options.source);
-    callbacks.onStatus({
-      kind: "info",
-      message: `✓ Pushed to company-db-agent — ${cdbResult.added} new, ${cdbResult.updated} updated (${cdbResult.total} total)`,
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    callbacks.onStatus({
-      kind: "error",
-      message: "company-db-agent push failed (non-blocking): " + message,
-    });
-  }
+  // Phase C: pushCompaniesToDb is a no-op stub. The Supabase write above
+  // is the single write path now. Call removed; Phase E will delete the
+  // stub function itself.
 
   return final;
 }

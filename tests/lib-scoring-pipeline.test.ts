@@ -53,19 +53,11 @@ function setupFetchMocks(opts: FetchMockOpts) {
     }
     calls.push({ url, init, body });
 
-    if (url.includes("company-db-agent.vercel.app/api/companies")) {
+    if (url.includes("/api/company-db")) {
       return {
         ok: true,
         status: 200,
         json: async () => opts.companyDb?.companies ?? [],
-        text: () => Promise.resolve(""),
-      };
-    }
-    if (url.includes("company-db-agent.vercel.app/api/sync")) {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ ok: true, added: 0, updated: 0, total: 0 }),
         text: () => Promise.resolve(""),
       };
     }
@@ -154,7 +146,7 @@ describe("runScoringPipeline", () => {
     });
 
     const urls = urlsCalled(calls);
-    expect(urls.some((u) => u.includes("/api/companies"))).toBe(true);
+    expect(urls.some((u) => u.includes("/api/company-db"))).toBe(true);
     expect(urls.some((u) => u.includes("/api/enrich"))).toBe(true);
     expect(urls.some((u) => u.includes("/api/score"))).toBe(true);
     expect(syncMock).toHaveBeenCalledTimes(1);
