@@ -15,6 +15,11 @@ import {
   inferEventFromUrl as _inferEventFromUrl,
   type InferredEvent,
 } from "@/lib/library/infer-event-from-url";
+import {
+  insertExtractionJob as _insertExtractionJob,
+  getExtractionJob as _getExtractionJob,
+  type ExtractionJobView,
+} from "@/lib/library/extraction-queries";
 
 export async function listAllAdminEvents(): Promise<AdminEventRow[]> {
   return _listAllAdminEvents();
@@ -47,4 +52,14 @@ export async function inferEventFromUrl(
   url: string,
 ): Promise<InferredEvent | null> {
   return _inferEventFromUrl(url);
+}
+
+export async function queueExtractionViaAgent(eventId: string): Promise<string> {
+  return _insertExtractionJob(eventId);
+}
+
+export async function getExtractionJobStatus(
+  jobId: string,
+): Promise<ExtractionJobView | null> {
+  return _getExtractionJob(jobId);
 }

@@ -9,6 +9,7 @@ type Props = {
   onTogglePeople: (id: string, value: boolean) => Promise<void>;
   onToggleCountry: (id: string, value: boolean) => Promise<void>;
   onFetch: (id: string) => Promise<void>;
+  onExtractViaAgent: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
 
@@ -40,6 +41,7 @@ export function EventAdminTable({
   onTogglePeople,
   onToggleCountry,
   onFetch,
+  onExtractViaAgent,
   onDelete,
 }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -157,6 +159,15 @@ export function EventAdminTable({
                       onClick={() => handle(r.id, () => onFetch(r.id))}
                     >
                       Fetch now
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={busy}
+                      title="Queue this event for the local-extract-agent (Playwright + Haiku + local Qwen on home PC / Mac)"
+                      onClick={() => handle(r.id, () => onExtractViaAgent(r.id))}
+                    >
+                      Extract via Agent
                     </button>
                     <button
                       type="button"

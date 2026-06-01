@@ -9,8 +9,10 @@ import { EventAdminTable } from "@/components/library/EventAdminTable";
 import {
   createEvent,
   deleteEvent,
+  getExtractionJobStatus,
   inferEventFromUrl,
   listAllAdminEvents,
+  queueExtractionViaAgent,
   triggerEventFetch,
   updateEvent,
 } from "@/app/library/admin/actions";
@@ -147,6 +149,65 @@ export default function AdminPage() {
     }
   };
 
+  const handleExtractViaAgent = async (id: string) => {
+    const row = rows.find((r) => r.id === id);
+    const label = row?.slug ?? id;
+    setStatus({
+      kind: "loading",
+      message: `Queueing '${label}' for the extraction agent…`,
+    });
+    let jobId: string;
+    try {
+      jobId = await queueExtractionViaAgent(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus({ kind: "error", message: "Queue failed: " + message });
+      return;
+    }
+    setStatus({
+      kind: "loading",
+      message: `Queued '${label}' (job ${jobId.slice(0, 8)})…  waiting for agent to claim and finish.`,
+    });
+    const startedAt = Date.now();
+    const timeoutMs = 10 * 60 * 1000;
+    const pollMs = 5000;
+    while (Date.now() - startedAt < timeoutMs) {
+      await new Promise((r) => setTimeout(r, pollMs));
+      try {
+        const job = await getExtractionJobStatus(jobId);
+        if (!job) continue;
+        if (job.status === "claimed" || job.status === "pending") {
+          setStatus({
+            kind: "loading",
+            message: `'${label}' — ${job.status}${job.worker_id ? ` by ${job.worker_id}` : ""} (${Math.round((Date.now() - startedAt) / 1000)}s)…`,
+          });
+          continue;
+        }
+        if (job.status === "done") {
+          await reload();
+          setStatus({
+            kind: "info",
+            message: `✓ Agent extracted '${label}': ${JSON.stringify(job.summary)}`,
+          });
+          return;
+        }
+        setStatus({
+          kind: "error",
+          message: `Agent ${job.status} on '${label}': ${job.error ?? "(no error message)"}`,
+        });
+        return;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setStatus({ kind: "error", message: "Polling failed: " + message });
+        return;
+      }
+    }
+    setStatus({
+      kind: "error",
+      message: `Agent did not finish '${label}' within ${timeoutMs / 60000}m — check the agent process and extraction_jobs row ${jobId}`,
+    });
+  };
+
   const handleDelete = async (id: string) => {
     const row = rows.find((r) => r.id === id);
     setStatus({ kind: "loading", message: `Deleting ${row?.slug ?? id}…` });
@@ -204,6 +265,7 @@ export default function AdminPage() {
           onTogglePeople={handleTogglePeople}
           onToggleCountry={handleToggleCountry}
           onFetch={handleFetch}
+          onExtractViaAgent={handleExtractViaAgent}
           onDelete={handleDelete}
         />
       </div>
