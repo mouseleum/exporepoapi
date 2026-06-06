@@ -26,6 +26,10 @@ import {
   type ExtractionJobListRow,
   type ExtractionCaptureView,
 } from "@/lib/library/extraction-queries";
+import {
+  quickExtract as _quickExtract,
+  type QuickExtractResult,
+} from "@/lib/library/quick-extract";
 
 export async function listAllAdminEvents(): Promise<AdminEventRow[]> {
   return _listAllAdminEvents();
@@ -62,6 +66,10 @@ export async function inferEventFromUrl(
 
 export async function queueExtractionViaAgent(eventId: string): Promise<string> {
   return _insertExtractionJob(eventId);
+}
+
+export async function quickExtract(url: string): Promise<QuickExtractResult> {
+  return _quickExtract(url);
 }
 
 export async function getExtractionJobStatus(

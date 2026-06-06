@@ -6,6 +6,7 @@ import { TopNav } from "@/components/TopNav";
 import { StatusBox } from "@/components/StatusBox";
 import { EventAddForm } from "@/components/library/EventAddForm";
 import { EventAdminTable } from "@/components/library/EventAdminTable";
+import { QuickExtractBar } from "@/components/library/QuickExtractBar";
 import {
   createEvent,
   deleteEvent,
@@ -243,9 +244,11 @@ export default function AdminPage() {
         </p>
       </div>
 
+      <QuickExtractBar onJobDone={reload} />
+
       <div className="results-section">
         <div className="results-header">
-          <span className="results-title">Add event</span>
+          <span className="results-title">Add event (advanced)</span>
         </div>
         <EventAddForm
           onCreate={handleCreate}
