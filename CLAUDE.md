@@ -25,6 +25,10 @@ Phased, additive, every phase ends in a working app and a commit:
 
 Don't skip ahead. Phase 1 does not start until Phase 0 is merged and verified on production.
 
+## External docs (Context7)
+
+Before writing code that touches **Next.js**, the **Vercel AI SDK**, **Zod**, or **Vercel serverless APIs** (functions, `vercel.json`, runtime config, cron), consult Context7 first: `mcp__context7__resolve-library-id` then `mcp__context7__query-docs`. Don't rely on training-data recall for these — their APIs drift fast and the answer in your weights is likely stale.
+
 ## PDL enrichment
 
 Parked behind `NEXT_PUBLIC_PDL_ENABLED` (default `false`) because the free-tier
