@@ -238,7 +238,8 @@ export default function AdminPage() {
         <p>
           Add events my company cares about. Cron will scrape DIMEDIS and
           Cybersec Europe automatically once a week, or use Fetch now.{" "}
-          <a href="/library/admin/captures">View extraction captures →</a>
+          <a href="/library/admin/jobs">View extraction jobs →</a>{" "}
+          <a href="/library/admin/captures">View captures →</a>
         </p>
       </div>
 

@@ -61,6 +61,41 @@ export async function getExtractionJob(
   };
 }
 
+export type ExtractionJobListRow = ExtractionJobView & {
+  event_slug: string;
+  event_name: string;
+};
+
+export async function listExtractionJobs(
+  supabase: SupabaseClient = createServiceClient(),
+): Promise<ExtractionJobListRow[]> {
+  const { data, error } = await supabase
+    .from("extraction_jobs")
+    .select(
+      "id, event_id, status, worker_id, retry_count, error, summary, created_at, completed_at, events!inner(slug, name)",
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`listExtractionJobs: ${error.message}`);
+  if (!data) return [];
+  return data.map((row) => {
+    const rawEvents = (row as { events: { slug: string; name: string }[] | { slug: string; name: string } | null }).events;
+    const e = Array.isArray(rawEvents) ? rawEvents[0] : rawEvents;
+    return {
+      id: row.id as string,
+      event_id: row.event_id as string,
+      event_slug: e?.slug ?? "",
+      event_name: e?.name ?? "",
+      status: row.status as ExtractionJobStatus,
+      worker_id: (row.worker_id as string | null) ?? null,
+      retry_count: row.retry_count as number,
+      error: (row.error as string | null) ?? null,
+      summary: row.summary,
+      created_at: row.created_at as string,
+      completed_at: (row.completed_at as string | null) ?? null,
+    };
+  });
+}
+
 export type ExtractionCaptureView = {
   id: string;
   event_id: string;

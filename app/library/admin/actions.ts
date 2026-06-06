@@ -18,10 +18,12 @@ import {
 import {
   insertExtractionJob as _insertExtractionJob,
   getExtractionJob as _getExtractionJob,
+  listExtractionJobs as _listExtractionJobs,
   listExtractionCaptures as _listExtractionCaptures,
   updateCaptureNotes as _updateCaptureNotes,
   togglePromoted as _togglePromoted,
   type ExtractionJobView,
+  type ExtractionJobListRow,
   type ExtractionCaptureView,
 } from "@/lib/library/extraction-queries";
 
@@ -66,6 +68,10 @@ export async function getExtractionJobStatus(
   jobId: string,
 ): Promise<ExtractionJobView | null> {
   return _getExtractionJob(jobId);
+}
+
+export async function listJobs(): Promise<ExtractionJobListRow[]> {
+  return _listExtractionJobs();
 }
 
 export async function listCaptures(): Promise<ExtractionCaptureView[]> {
