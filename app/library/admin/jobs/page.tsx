@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { TopNav } from "@/components/TopNav";
 import { StatusBox } from "@/components/StatusBox";
 import { JobsTable } from "@/components/library/JobsTable";
+import { AgentStatusBadge } from "@/components/library/AgentStatusBadge";
 import { listJobs } from "@/app/library/admin/actions";
 import type {
   ExtractionJobListRow,
@@ -74,6 +75,8 @@ export default function JobsPage() {
           <a href="/library/admin/captures">View captures →</a>
         </p>
       </div>
+
+      <AgentStatusBadge />
 
       <StatusBox status={status} />
 

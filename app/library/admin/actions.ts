@@ -22,9 +22,11 @@ import {
   listExtractionCaptures as _listExtractionCaptures,
   updateCaptureNotes as _updateCaptureNotes,
   togglePromoted as _togglePromoted,
+  getAgentActivity as _getAgentActivity,
   type ExtractionJobView,
   type ExtractionJobListRow,
   type ExtractionCaptureView,
+  type AgentActivity,
 } from "@/lib/library/extraction-queries";
 import {
   quickExtract as _quickExtract,
@@ -92,4 +94,8 @@ export async function updateCaptureNotes(captureId: string, notes: string): Prom
 
 export async function togglePromoted(captureId: string, promote: boolean): Promise<void> {
   return _togglePromoted(captureId, promote);
+}
+
+export async function getAgentActivity(): Promise<AgentActivity> {
+  return _getAgentActivity();
 }

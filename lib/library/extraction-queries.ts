@@ -66,6 +66,58 @@ export type ExtractionJobListRow = ExtractionJobView & {
   event_name: string;
 };
 
+export type AgentActivity = {
+  /** ISO timestamp of the most recent extraction_jobs row claimed by any worker, or null if nothing's ever been claimed. */
+  last_claim_at: string | null;
+  /** Worker id from the most recent claim. */
+  last_worker_id: string | null;
+  /** Jobs currently sitting in 'pending'. */
+  pending_count: number;
+  /** Jobs currently in flight (status='claimed'). */
+  claimed_count: number;
+  /** Jobs that completed (status='done') in the last hour — useful as a "agent did real work recently" signal. */
+  done_in_last_hour: number;
+};
+
+export async function getAgentActivity(
+  supabase: SupabaseClient = createServiceClient(),
+): Promise<AgentActivity> {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const [lastClaim, pending, claimed, doneRecent] = await Promise.all([
+    supabase
+      .from("extraction_jobs")
+      .select("claimed_at, worker_id")
+      .not("claimed_at", "is", null)
+      .order("claimed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("extraction_jobs")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
+      .from("extraction_jobs")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "claimed"),
+    supabase
+      .from("extraction_jobs")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "done")
+      .gte("completed_at", oneHourAgo),
+  ]);
+  if (lastClaim.error) throw new Error(`getAgentActivity lastClaim: ${lastClaim.error.message}`);
+  if (pending.error) throw new Error(`getAgentActivity pending: ${pending.error.message}`);
+  if (claimed.error) throw new Error(`getAgentActivity claimed: ${claimed.error.message}`);
+  if (doneRecent.error) throw new Error(`getAgentActivity doneRecent: ${doneRecent.error.message}`);
+  return {
+    last_claim_at: (lastClaim.data?.claimed_at as string | null) ?? null,
+    last_worker_id: (lastClaim.data?.worker_id as string | null) ?? null,
+    pending_count: pending.count ?? 0,
+    claimed_count: claimed.count ?? 0,
+    done_in_last_hour: doneRecent.count ?? 0,
+  };
+}
+
 export async function listExtractionJobs(
   supabase: SupabaseClient = createServiceClient(),
 ): Promise<ExtractionJobListRow[]> {

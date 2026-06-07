@@ -7,6 +7,7 @@ import { StatusBox } from "@/components/StatusBox";
 import { EventAddForm } from "@/components/library/EventAddForm";
 import { EventAdminTable } from "@/components/library/EventAdminTable";
 import { QuickExtractBar } from "@/components/library/QuickExtractBar";
+import { AgentStatusBadge } from "@/components/library/AgentStatusBadge";
 import {
   createEvent,
   deleteEvent,
@@ -243,6 +244,8 @@ export default function AdminPage() {
           <a href="/library/admin/captures">View captures →</a>
         </p>
       </div>
+
+      <AgentStatusBadge />
 
       <QuickExtractBar onJobDone={reload} />
 
