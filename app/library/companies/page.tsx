@@ -11,7 +11,35 @@ import {
 import type { CompanyRow } from "@/lib/library/companies-queries";
 import type { Status } from "@/lib/types";
 
-type FilterKind = "all" | "missing" | "overrides" | string;
+type FilterKind =
+  | "all"
+  | "missing"
+  | "overrides"
+  | "hs_met_me"
+  | "hs_met_team"
+  | "hs_in_pipeline"
+  | "hs_no_match"
+  | string;
+
+type HubspotStatus =
+  | { connected: false }
+  | {
+      connected: true;
+      portalId: number;
+      currentUserEmail: string | null;
+      lastSyncedAt: string | null;
+    };
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return "never";
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "unknown";
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 3600) return `${Math.round(diffSec / 60)}m ago`;
+  if (diffSec < 86_400) return `${Math.round(diffSec / 3600)}h ago`;
+  return `${Math.round(diffSec / 86_400)}d ago`;
+}
 
 function flag(country: string | null): string {
   if (!country || !/^[A-Z]{2}$/.test(country)) return "";
@@ -35,20 +63,104 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKind>("all");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [hubspot, setHubspot] = useState<HubspotStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  async function reloadHubspotStatus(): Promise<void> {
+    try {
+      const res = await fetch("/api/hubspot/status", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as HubspotStatus;
+      setHubspot(data);
+    } catch {
+      /* network blip — leave previous state */
+    }
+  }
+
+  async function reloadCompanies(): Promise<void> {
+    setStatus({ kind: "loading", message: "Loading companies…" });
+    try {
+      const data = await listCompanies();
+      setRows(data);
+      setStatus({ kind: "idle" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus({ kind: "error", message: "Load failed: " + message });
+    }
+  }
 
   useEffect(() => {
-    void (async () => {
-      setStatus({ kind: "loading", message: "Loading companies…" });
-      try {
-        const data = await listCompanies();
-        setRows(data);
-        setStatus({ kind: "idle" });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setStatus({ kind: "error", message: "Load failed: " + message });
-      }
-    })();
+    void reloadCompanies();
+    void reloadHubspotStatus();
   }, []);
+
+  // One-shot URL state from OAuth callback — show a status line, then clean.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const hs = params.get("hubspot");
+    if (!hs) return;
+    if (hs === "connected") {
+      setStatus({ kind: "info", message: "✓ HubSpot connected. Click Sync to pull signals." });
+    } else if (hs === "error") {
+      const reason = params.get("reason") ?? "unknown";
+      setStatus({ kind: "error", message: `HubSpot connect failed: ${reason}` });
+    }
+    params.delete("hubspot");
+    params.delete("reason");
+    const next = window.location.pathname + (params.toString() ? `?${params}` : "");
+    window.history.replaceState({}, "", next);
+  }, []);
+
+  async function handleSync(): Promise<void> {
+    setSyncing(true);
+    setStatus({ kind: "loading", message: "Syncing HubSpot…" });
+    try {
+      const res = await fetch("/api/hubspot/sync", { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const summary = (await res.json()) as {
+        hubspotCompaniesMatched: number;
+        signalsWritten: number;
+        metByMeCount: number;
+        metByTeamCount: number;
+        inPipelineCount: number;
+        errors: Array<{ message: string }>;
+      };
+      const errPart = summary.errors.length > 0 ? ` · ${summary.errors.length} errors` : "";
+      setStatus({
+        kind: "info",
+        message:
+          `✓ Synced. ${summary.signalsWritten}/${summary.hubspotCompaniesMatched} matched · ` +
+          `${summary.metByMeCount} met by you · ${summary.metByTeamCount} met by team · ` +
+          `${summary.inPipelineCount} in pipeline${errPart}`,
+      });
+      await reloadCompanies();
+      await reloadHubspotStatus();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus({ kind: "error", message: "Sync failed: " + message });
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleDisconnect(): Promise<void> {
+    try {
+      const res = await fetch("/api/auth/hubspot/disconnect", { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setHubspot({ connected: false });
+      setStatus({ kind: "info", message: "HubSpot disconnected. Signals stay until next sync." });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus({ kind: "error", message: "Disconnect failed: " + message });
+    }
+  }
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -63,7 +175,13 @@ export default function CompaniesPage() {
     const top = Array.from(byCountry.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
-    return { total, resolved, missing, overrides, top };
+
+    const matched = rows.filter((r) => r.hubspot).length;
+    const metByMe = rows.filter((r) => r.hubspot?.met_by_me).length;
+    const metByTeam = rows.filter((r) => r.hubspot?.met_by_team).length;
+    const inPipeline = rows.filter((r) => r.hubspot?.in_pipeline).length;
+
+    return { total, resolved, missing, overrides, top, matched, metByMe, metByTeam, inPipeline };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -71,13 +189,19 @@ export default function CompaniesPage() {
     return rows.filter((r) => {
       if (filter === "missing" && r.country) return false;
       if (filter === "overrides" && r.country_confidence !== "override") return false;
-      if (
+      if (filter === "hs_met_me" && !r.hubspot?.met_by_me) return false;
+      if (filter === "hs_met_team" && !r.hubspot?.met_by_team) return false;
+      if (filter === "hs_in_pipeline" && !r.hubspot?.in_pipeline) return false;
+      if (filter === "hs_no_match" && r.hubspot) return false;
+      const isCountryFilter =
         filter !== "all" &&
         filter !== "missing" &&
         filter !== "overrides" &&
-        r.country !== filter
-      )
-        return false;
+        filter !== "hs_met_me" &&
+        filter !== "hs_met_team" &&
+        filter !== "hs_in_pipeline" &&
+        filter !== "hs_no_match";
+      if (isCountryFilter && r.country !== filter) return false;
       if (!q) return true;
       if (r.name.toLowerCase().includes(q)) return true;
       if (r.name_normalized.includes(q)) return true;
@@ -94,7 +218,10 @@ export default function CompaniesPage() {
   const handleOverride = async (id: string, iso: string) => {
     try {
       const updated = await overrideCompanyCountry(id, iso);
-      setRows((rs) => rs.map((r) => (r.id === id ? updated : r)));
+      // Server action doesn't carry HubSpot signals — re-merge from current state.
+      setRows((rs) =>
+        rs.map((r) => (r.id === id ? { ...updated, hubspot: r.hubspot } : r)),
+      );
       setEditingId(null);
       setStatus({
         kind: "info",
@@ -123,6 +250,14 @@ export default function CompaniesPage() {
         </p>
       </div>
 
+      <HubspotStrip
+        status={hubspot}
+        syncing={syncing}
+        onSync={handleSync}
+        onDisconnect={handleDisconnect}
+      />
+
+
       <div className="results-section">
         <div className="results-header">
           <span className="results-title">Stats</span>
@@ -132,6 +267,15 @@ export default function CompaniesPage() {
           <span><strong>{stats.resolved}</strong> with country</span>
           <span><strong>{stats.missing}</strong> missing</span>
           <span><strong>{stats.overrides}</strong> manual overrides</span>
+          {stats.matched > 0 && (
+            <>
+              <span style={{ color: "#7a7a88" }}>·</span>
+              <span><strong>{stats.matched}</strong> HubSpot match</span>
+              <span style={{ color: "#7a7a88" }}>{stats.metByMe} met by you</span>
+              <span style={{ color: "#7a7a88" }}>{stats.metByTeam} met by team</span>
+              <span style={{ color: "#7a7a88" }}>{stats.inPipeline} in pipeline</span>
+            </>
+          )}
           <span style={{ color: "#7a7a88" }}>·</span>
           {stats.top.map(([cc, n]) => (
             <span key={cc}>
@@ -175,6 +319,34 @@ export default function CompaniesPage() {
             >
               Overrides ({stats.overrides})
             </FilterChip>
+            {stats.matched > 0 && (
+              <>
+                <FilterChip
+                  active={filter === "hs_met_me"}
+                  onClick={() => setFilter("hs_met_me")}
+                >
+                  💼 Met by you ({stats.metByMe})
+                </FilterChip>
+                <FilterChip
+                  active={filter === "hs_met_team"}
+                  onClick={() => setFilter("hs_met_team")}
+                >
+                  👥 Met by team ({stats.metByTeam})
+                </FilterChip>
+                <FilterChip
+                  active={filter === "hs_in_pipeline"}
+                  onClick={() => setFilter("hs_in_pipeline")}
+                >
+                  📈 In pipeline ({stats.inPipeline})
+                </FilterChip>
+                <FilterChip
+                  active={filter === "hs_no_match"}
+                  onClick={() => setFilter("hs_no_match")}
+                >
+                  No HubSpot ({stats.total - stats.matched})
+                </FilterChip>
+              </>
+            )}
             {stats.top.slice(0, 10).map(([cc, n]) => (
               <FilterChip
                 key={cc}
@@ -194,6 +366,9 @@ export default function CompaniesPage() {
               <th style={{ padding: "8px 12px", width: 140 }}>COUNTRY</th>
               <th style={{ padding: "8px 12px", width: 90 }}>VIA</th>
               <th style={{ padding: "8px 12px", width: 200 }}>SOURCES</th>
+              {hubspot?.connected && (
+                <th style={{ padding: "8px 12px", width: 200 }}>HUBSPOT</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -247,6 +422,11 @@ export default function CompaniesPage() {
                   <td style={{ padding: "8px 12px", fontSize: 11, color: "#7a7a88", fontFamily: "var(--mono, monospace)" }}>
                     {r.country_sources.length > 0 ? r.country_sources.join(", ") : r.source}
                   </td>
+                  {hubspot?.connected && (
+                    <td style={{ padding: "8px 12px" }}>
+                      <HubspotBadges signals={r.hubspot} />
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -259,6 +439,165 @@ export default function CompaniesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function HubspotStrip({
+  status,
+  syncing,
+  onSync,
+  onDisconnect,
+}: {
+  status: HubspotStatus | null;
+  syncing: boolean;
+  onSync: () => void;
+  onDisconnect: () => void;
+}) {
+  // Until status is loaded we render nothing so the layout doesn't flash a
+  // "Not connected" state for users who already have HubSpot wired up.
+  if (status === null) return null;
+
+  const baseStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "10px 16px",
+    margin: "12px 0",
+    border: "1px solid #2a2a30",
+    borderRadius: 6,
+    fontFamily: "var(--mono, monospace)",
+    fontSize: 13,
+    flexWrap: "wrap",
+  };
+
+  if (!status.connected) {
+    return (
+      <div style={baseStyle}>
+        <span style={{ color: "#7a7a88" }}>
+          HubSpot · <strong style={{ color: "#cfcfd6" }}>Not connected</strong>
+        </span>
+        <span style={{ flex: 1 }} />
+        <a
+          href="/api/auth/hubspot/connect"
+          style={{
+            fontSize: 12,
+            padding: "4px 12px",
+            background: "#00e5a022",
+            border: "1px solid #00e5a066",
+            color: "#00e5a0",
+            borderRadius: 3,
+            textDecoration: "none",
+          }}
+        >
+          Connect
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div style={baseStyle}>
+      <span style={{ color: "#7a7a88" }}>HubSpot · </span>
+      <span>
+        Connected as <strong>{status.currentUserEmail ?? "(unknown user)"}</strong>
+      </span>
+      <span style={{ color: "#7a7a88" }}>·</span>
+      <span style={{ color: "#7a7a88" }}>
+        Last synced {formatRelative(status.lastSyncedAt)}
+      </span>
+      <span style={{ flex: 1 }} />
+      <button
+        onClick={onSync}
+        disabled={syncing}
+        style={{
+          fontSize: 12,
+          padding: "4px 12px",
+          background: syncing ? "transparent" : "#00e5a022",
+          border: `1px solid ${syncing ? "#2a2a30" : "#00e5a066"}`,
+          color: syncing ? "#7a7a88" : "#00e5a0",
+          borderRadius: 3,
+          cursor: syncing ? "wait" : "pointer",
+        }}
+      >
+        {syncing ? "Syncing…" : "Sync now"}
+      </button>
+      <button
+        onClick={onDisconnect}
+        style={{
+          fontSize: 12,
+          padding: "4px 12px",
+          background: "transparent",
+          border: "1px solid #2a2a30",
+          color: "#7a7a88",
+          borderRadius: 3,
+          cursor: "pointer",
+        }}
+      >
+        Disconnect
+      </button>
+    </div>
+  );
+}
+
+function HubspotBadges({
+  signals,
+}: {
+  signals: CompanyRow["hubspot"];
+}) {
+  if (!signals) return <span style={{ color: "#7a7a88", fontSize: 11 }}>—</span>;
+  const dealTitle = signals.latest_open_deal_stage
+    ? `${signals.latest_open_deal_stage}${
+        signals.latest_open_deal_amount != null
+          ? ` · ${signals.latest_open_deal_amount.toLocaleString()}`
+          : ""
+      }`
+    : "Open deal";
+  const meetTitle = signals.last_engagement_owner_name
+    ? `Last touch by ${signals.last_engagement_owner_name}${
+        signals.last_engagement_at ? ` · ${formatRelative(signals.last_engagement_at)}` : ""
+      }`
+    : signals.last_engagement_at
+      ? `Last touch ${formatRelative(signals.last_engagement_at)}`
+      : "Engagement logged";
+  return (
+    <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+      {signals.met_by_me && (
+        <Badge color="#00e5a0" title={meetTitle}>💼 You</Badge>
+      )}
+      {signals.met_by_team && (
+        <Badge color="#00ccff" title={meetTitle}>👥 Team</Badge>
+      )}
+      {signals.in_pipeline && (
+        <Badge color="#ffaa00" title={dealTitle}>📈 Pipeline</Badge>
+      )}
+    </span>
+  );
+}
+
+function Badge({
+  color,
+  title,
+  children,
+}: {
+  color: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      title={title}
+      style={{
+        fontFamily: "var(--mono, monospace)",
+        fontSize: 11,
+        padding: "2px 6px",
+        border: `1px solid ${color}66`,
+        color,
+        borderRadius: 3,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
