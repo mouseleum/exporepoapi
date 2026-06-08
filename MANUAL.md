@@ -64,6 +64,26 @@ Tags appear on rows in Library and Compare so you know which ones you've already
 
 ---
 
+## Connect HubSpot (optional)
+
+When you wire HubSpot to `/library/companies`, every company picks up three badges showing prior engagement:
+
+- 💼 **You** — there's a HubSpot meeting / call / email / note on a contact at this company where you were the owner.
+- 👥 **Team** — same, but the owner was a colleague (or unowned).
+- 📈 **Pipeline** — at least one open deal is associated with the company. Hover for stage + amount.
+
+One-time setup:
+
+1. In **developers.hubspot.com → Apps → Create app**, add an OAuth redirect URL of `http://localhost:3000/api/auth/hubspot/callback` (and the Vercel equivalent if you're deploying). Request the read scopes the integration uses (companies, contacts, deals, owners, pipelines, emails).
+2. Put the resulting **Client ID** + **Client Secret** into `.env.local` (or Vercel env) as `HUBSPOT_CLIENT_ID` / `HUBSPOT_CLIENT_SECRET`.
+3. Apply migration `db/migrations/0009_hubspot_oauth_and_signals.sql` in the Supabase SQL Editor.
+4. Open `/library/companies` → strip at the top says **HubSpot · Not connected**. Click **Connect** → HubSpot consent screen → redirected back.
+5. Click **Sync now**. Sync iterates per matched company; full portals can take a minute. When it settles, the strip shows "Last synced just now" and matching rows light up with badges.
+
+Filter chips for **Met by you / Met by team / In pipeline / No HubSpot** let you slice the Library by engagement state — useful for working an exhibitor list before a show. Clicking **Disconnect** clears the token; the signals stay visible until the next sync.
+
+---
+
 ## Data model in one paragraph
 
 `companies` is the global deep store (~10k Apollo rows + anything seeded from CSV uploads). `events` + `event_exhibitors` is the per-event lists, joined to `companies` by normalised name. `company_tags` is the tag layer. The Ranker also runs against this same data — Library is just the persistent counterpart to the CSV one-shot.

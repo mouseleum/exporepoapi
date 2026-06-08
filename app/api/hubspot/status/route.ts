@@ -32,6 +32,11 @@ export async function GET(): Promise<Response> {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Migration 0009 not applied yet — return the same "not connected" shape
+    // instead of 500 so the Library UI degrades cleanly until the SQL is run.
+    if (message.toLowerCase().includes("does not exist") || message.toLowerCase().includes("schema cache")) {
+      return NextResponse.json({ connected: false, migrationPending: true });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
