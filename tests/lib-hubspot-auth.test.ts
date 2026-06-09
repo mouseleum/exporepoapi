@@ -1,91 +1,195 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadHubspotAuth, lookupOwnerIdByEmail } from "../lib/hubspot/auth";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  HUBSPOT_SCOPES,
+  buildAuthorizeUrl,
+  deriveRedirectUri,
+  getValidAccessToken,
+  type TokenRow,
+} from "../lib/hubspot/auth";
 
-// Phase 9: HubSpot Private App auth helpers. The token comes from env; the
-// owner_id is resolved (when an email is configured) via a single GET to
-// /crm/v3/owners. No persistent state — auth is configuration.
+// Phase 9: HubSpot OAuth helpers — pure-function tests and getValidAccessToken
+// refresh path. Token-exchange + introspect networking is covered indirectly
+// via the callback route at integration time; here we focus on logic.
 
-describe("loadHubspotAuth", () => {
-  const origToken = process.env.HUBSPOT_ACCESS_TOKEN;
-  const origEmail = process.env.HUBSPOT_OWNER_EMAIL;
+function makeSupabase(initial: TokenRow | null) {
+  let row = initial;
+  const upserts: TokenRow[] = [];
 
-  beforeEach(() => {
-    delete process.env.HUBSPOT_ACCESS_TOKEN;
-    delete process.env.HUBSPOT_OWNER_EMAIL;
-  });
-  afterEach(() => {
-    if (origToken === undefined) delete process.env.HUBSPOT_ACCESS_TOKEN;
-    else process.env.HUBSPOT_ACCESS_TOKEN = origToken;
-    if (origEmail === undefined) delete process.env.HUBSPOT_OWNER_EMAIL;
-    else process.env.HUBSPOT_OWNER_EMAIL = origEmail;
-    vi.restoreAllMocks();
-  });
+  const tokensTable = {
+    select: vi.fn(() => ({
+      order: vi.fn(() => ({
+        limit: vi.fn(() => ({
+          maybeSingle: vi.fn(async () => ({ data: row, error: null })),
+        })),
+      })),
+    })),
+    upsert: vi.fn(async (next: Record<string, unknown>) => {
+      const merged: TokenRow = {
+        portal_id: next.portal_id as number,
+        access_token: next.access_token as string,
+        refresh_token: next.refresh_token as string,
+        expires_at: next.expires_at as string,
+        scope: next.scope as string,
+        current_user_owner_id: (next.current_user_owner_id as string | null) ?? null,
+        current_user_email: (next.current_user_email as string | null) ?? null,
+      };
+      upserts.push(merged);
+      row = merged;
+      return { error: null };
+    }),
+  };
 
-  it("returns null when HUBSPOT_ACCESS_TOKEN is missing", async () => {
-    expect(await loadHubspotAuth()).toBeNull();
-  });
+  const supabase = {
+    from: vi.fn((table: string) => {
+      if (table === "hubspot_oauth_tokens") return tokensTable;
+      throw new Error(`unexpected table: ${table}`);
+    }),
+  } as unknown as SupabaseClient;
 
-  it("returns token-only auth when no owner email is set", async () => {
-    process.env.HUBSPOT_ACCESS_TOKEN = "pat-1234";
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
-    const auth = await loadHubspotAuth();
-    expect(auth).toEqual({
-      accessToken: "pat-1234",
-      currentUserEmail: null,
-      currentUserOwnerId: null,
+  return { supabase, upserts, get row() { return row; } };
+}
+
+describe("buildAuthorizeUrl", () => {
+  it("includes client_id, redirect_uri, scopes, state", () => {
+    const url = buildAuthorizeUrl({
+      clientId: "abc-123",
+      redirectUri: "https://example.com/api/auth/hubspot/callback",
+      state: "deadbeef",
     });
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("resolves owner_id when HUBSPOT_OWNER_EMAIL is set", async () => {
-    process.env.HUBSPOT_ACCESS_TOKEN = "pat-1234";
-    process.env.HUBSPOT_OWNER_EMAIL = "me@example.com";
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ results: [{ id: "owner-42", email: "me@example.com" }] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
+    const parsed = new URL(url);
+    expect(parsed.origin + parsed.pathname).toBe("https://app.hubspot.com/oauth/authorize");
+    expect(parsed.searchParams.get("client_id")).toBe("abc-123");
+    expect(parsed.searchParams.get("redirect_uri")).toBe(
+      "https://example.com/api/auth/hubspot/callback",
     );
-    const auth = await loadHubspotAuth();
-    expect(auth).toEqual({
-      accessToken: "pat-1234",
-      currentUserEmail: "me@example.com",
-      currentUserOwnerId: "owner-42",
-    });
-  });
-
-  it("leaves owner_id null when the email doesn't resolve to an owner", async () => {
-    process.env.HUBSPOT_ACCESS_TOKEN = "pat-1234";
-    process.env.HUBSPOT_OWNER_EMAIL = "ghost@example.com";
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ results: [] }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    );
-    const auth = await loadHubspotAuth();
-    expect(auth?.currentUserOwnerId).toBeNull();
-    expect(auth?.currentUserEmail).toBe("ghost@example.com");
+    expect(parsed.searchParams.get("scope")).toBe(HUBSPOT_SCOPES);
+    expect(parsed.searchParams.get("state")).toBe("deadbeef");
   });
 });
 
-describe("lookupOwnerIdByEmail", () => {
+describe("deriveRedirectUri", () => {
+  const original = process.env.HUBSPOT_REDIRECT_URI;
   afterEach(() => {
+    if (original === undefined) delete process.env.HUBSPOT_REDIRECT_URI;
+    else process.env.HUBSPOT_REDIRECT_URI = original;
+  });
+
+  it("honors HUBSPOT_REDIRECT_URI override when set", () => {
+    process.env.HUBSPOT_REDIRECT_URI = "https://override.example/cb";
+    const req = new Request("https://something-else.example/api/auth/hubspot/connect");
+    expect(deriveRedirectUri(req)).toBe("https://override.example/cb");
+  });
+
+  it("derives from request origin when override is not set", () => {
+    delete process.env.HUBSPOT_REDIRECT_URI;
+    const req = new Request("https://exporepoapi.vercel.app/api/auth/hubspot/connect");
+    expect(deriveRedirectUri(req)).toBe(
+      "https://exporepoapi.vercel.app/api/auth/hubspot/callback",
+    );
+  });
+});
+
+describe("getValidAccessToken", () => {
+  const origClientId = process.env.HUBSPOT_CLIENT_ID;
+  const origSecret = process.env.HUBSPOT_CLIENT_SECRET;
+
+  beforeEach(() => {
+    process.env.HUBSPOT_CLIENT_ID = "test-client";
+    process.env.HUBSPOT_CLIENT_SECRET = "test-secret";
+  });
+  afterEach(() => {
+    if (origClientId === undefined) delete process.env.HUBSPOT_CLIENT_ID;
+    else process.env.HUBSPOT_CLIENT_ID = origClientId;
+    if (origSecret === undefined) delete process.env.HUBSPOT_CLIENT_SECRET;
+    else process.env.HUBSPOT_CLIENT_SECRET = origSecret;
     vi.restoreAllMocks();
   });
 
-  it("returns null on non-OK response rather than throwing", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("nope", { status: 401 }));
-    expect(await lookupOwnerIdByEmail("pat", "me@example.com")).toBeNull();
+  it("returns null when no token row exists", async () => {
+    const { supabase } = makeSupabase(null);
+    expect(await getValidAccessToken(supabase)).toBeNull();
   });
 
-  it("URL-encodes the email parameter", async () => {
-    let captured = "";
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      captured = typeof input === "string" ? input : (input as URL).toString();
-      return new Response(JSON.stringify({ results: [] }), { status: 200 });
+  it("returns stored token when not near expiry (no refresh call)", async () => {
+    const future = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const { supabase } = makeSupabase({
+      portal_id: 123,
+      access_token: "current",
+      refresh_token: "r",
+      expires_at: future,
+      scope: HUBSPOT_SCOPES,
+      current_user_owner_id: "owner-1",
+      current_user_email: "me@example.com",
     });
-    await lookupOwnerIdByEmail("pat", "first+filter@example.com");
-    expect(captured).toContain("email=first%2Bfilter%40example.com");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("should not be called", { status: 500 }),
+    );
+
+    const result = await getValidAccessToken(supabase);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      accessToken: "current",
+      portalId: 123,
+      currentUserOwnerId: "owner-1",
+      currentUserEmail: "me@example.com",
+    });
+  });
+
+  it("refreshes and persists when token is past expiry", async () => {
+    const past = new Date(Date.now() - 60_000).toISOString();
+    const store = makeSupabase({
+      portal_id: 123,
+      access_token: "old",
+      refresh_token: "r-old",
+      expires_at: past,
+      scope: HUBSPOT_SCOPES,
+      current_user_owner_id: "owner-1",
+      current_user_email: "me@example.com",
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "new",
+          refresh_token: "r-new",
+          expires_in: 1800,
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const result = await getValidAccessToken(store.supabase);
+    expect(result?.accessToken).toBe("new");
+    expect(store.upserts).toHaveLength(1);
+    const persisted = store.upserts[0]!;
+    expect(persisted.access_token).toBe("new");
+    expect(persisted.refresh_token).toBe("r-new");
+    expect(new Date(persisted.expires_at).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("refreshes when within the skew window even though token hasn't expired", async () => {
+    const inThirtySeconds = new Date(Date.now() + 30_000).toISOString();
+    const store = makeSupabase({
+      portal_id: 123,
+      access_token: "near-expiry",
+      refresh_token: "r",
+      expires_at: inThirtySeconds,
+      scope: HUBSPOT_SCOPES,
+      current_user_owner_id: null,
+      current_user_email: null,
+    });
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ access_token: "fresh", refresh_token: "r2", expires_in: 1800 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const result = await getValidAccessToken(store.supabase);
+    expect(result?.accessToken).toBe("fresh");
+    expect(store.upserts).toHaveLength(1);
   });
 });

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadHubspotAuth } from "./auth";
+import { getValidAccessToken } from "./auth";
 import {
   batchListAssociationsFromContacts,
   batchReadDeals,
@@ -106,11 +106,11 @@ export async function syncAllSignals(supabase: SupabaseClient): Promise<SyncSumm
   const syncStartIso = new Date().toISOString();
   const errors: SyncSummary["errors"] = [];
 
-  const auth = await loadHubspotAuth();
-  if (!auth) {
-    throw new Error("HUBSPOT_ACCESS_TOKEN is not set");
+  const tokenInfo = await getValidAccessToken(supabase);
+  if (!tokenInfo) {
+    throw new Error("HubSpot not connected");
   }
-  const { accessToken, currentUserOwnerId } = auth;
+  const { accessToken, currentUserOwnerId } = tokenInfo;
 
   const companies = await loadExporepoCompanies(supabase);
   const domainToCompanyId = new Map<string, string>();

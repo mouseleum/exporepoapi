@@ -25,9 +25,9 @@ type HubspotStatus =
   | { connected: false }
   | {
       connected: true;
+      portalId: number;
       currentUserEmail: string | null;
       lastSyncedAt: string | null;
-      migrationPending?: boolean;
     };
 
 function formatRelative(iso: string | null): string {
@@ -94,6 +94,24 @@ export default function CompaniesPage() {
     void reloadHubspotStatus();
   }, []);
 
+  // One-shot URL state from OAuth callback — show a status line, then clean.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const hs = params.get("hubspot");
+    if (!hs) return;
+    if (hs === "connected") {
+      setStatus({ kind: "info", message: "✓ HubSpot connected. Click Sync to pull signals." });
+    } else if (hs === "error") {
+      const reason = params.get("reason") ?? "unknown";
+      setStatus({ kind: "error", message: `HubSpot connect failed: ${reason}` });
+    }
+    params.delete("hubspot");
+    params.delete("reason");
+    const next = window.location.pathname + (params.toString() ? `?${params}` : "");
+    window.history.replaceState({}, "", next);
+  }, []);
+
   async function handleSync(): Promise<void> {
     setSyncing(true);
     setStatus({ kind: "loading", message: "Syncing HubSpot…" });
@@ -129,6 +147,20 @@ export default function CompaniesPage() {
     }
   }
 
+  async function handleDisconnect(): Promise<void> {
+    try {
+      const res = await fetch("/api/auth/hubspot/disconnect", { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      setHubspot({ connected: false });
+      setStatus({ kind: "info", message: "HubSpot disconnected. Signals stay until next sync." });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setStatus({ kind: "error", message: "Disconnect failed: " + message });
+    }
+  }
 
   const stats = useMemo(() => {
     const total = rows.length;
@@ -218,7 +250,12 @@ export default function CompaniesPage() {
         </p>
       </div>
 
-      <HubspotStrip status={hubspot} syncing={syncing} onSync={handleSync} />
+      <HubspotStrip
+        status={hubspot}
+        syncing={syncing}
+        onSync={handleSync}
+        onDisconnect={handleDisconnect}
+      />
 
 
       <div className="results-section">
@@ -409,13 +446,15 @@ function HubspotStrip({
   status,
   syncing,
   onSync,
+  onDisconnect,
 }: {
   status: HubspotStatus | null;
   syncing: boolean;
   onSync: () => void;
+  onDisconnect: () => void;
 }) {
   // Until status is loaded we render nothing so the layout doesn't flash a
-  // "Not configured" state for users who already have HubSpot wired up.
+  // "Not connected" state for users who already have HubSpot wired up.
   if (status === null) return null;
 
   const baseStyle: React.CSSProperties = {
@@ -435,50 +474,66 @@ function HubspotStrip({
     return (
       <div style={baseStyle}>
         <span style={{ color: "#7a7a88" }}>
-          HubSpot · <strong style={{ color: "#cfcfd6" }}>Not configured</strong>
+          HubSpot · <strong style={{ color: "#cfcfd6" }}>Not connected</strong>
         </span>
-        <span style={{ color: "#7a7a88", fontSize: 11 }}>
-          Set HUBSPOT_ACCESS_TOKEN (+ optional HUBSPOT_OWNER_EMAIL) in env
-        </span>
+        <span style={{ flex: 1 }} />
+        <a
+          href="/api/auth/hubspot/connect"
+          style={{
+            fontSize: 12,
+            padding: "4px 12px",
+            background: "#00e5a022",
+            border: "1px solid #00e5a066",
+            color: "#00e5a0",
+            borderRadius: 3,
+            textDecoration: "none",
+          }}
+        >
+          Connect
+        </a>
       </div>
     );
   }
 
-  const ownerLabel = status.currentUserEmail
-    ? <>as <strong>{status.currentUserEmail}</strong></>
-    : <span style={{ color: "#ffaa00" }}>(HUBSPOT_OWNER_EMAIL unset — all engagements read as Team)</span>;
-
   return (
     <div style={baseStyle}>
       <span style={{ color: "#7a7a88" }}>HubSpot · </span>
-      <span>Connected {ownerLabel}</span>
+      <span>
+        Connected as <strong>{status.currentUserEmail ?? "(unknown user)"}</strong>
+      </span>
       <span style={{ color: "#7a7a88" }}>·</span>
       <span style={{ color: "#7a7a88" }}>
         Last synced {formatRelative(status.lastSyncedAt)}
       </span>
-      {status.migrationPending && (
-        <>
-          <span style={{ color: "#7a7a88" }}>·</span>
-          <span style={{ color: "#ffaa00", fontSize: 11 }}>
-            Apply 0009 migration in Supabase to enable signals
-          </span>
-        </>
-      )}
       <span style={{ flex: 1 }} />
       <button
         onClick={onSync}
-        disabled={syncing || status.migrationPending}
+        disabled={syncing}
         style={{
           fontSize: 12,
           padding: "4px 12px",
-          background: syncing || status.migrationPending ? "transparent" : "#00e5a022",
-          border: `1px solid ${syncing || status.migrationPending ? "#2a2a30" : "#00e5a066"}`,
-          color: syncing || status.migrationPending ? "#7a7a88" : "#00e5a0",
+          background: syncing ? "transparent" : "#00e5a022",
+          border: `1px solid ${syncing ? "#2a2a30" : "#00e5a066"}`,
+          color: syncing ? "#7a7a88" : "#00e5a0",
           borderRadius: 3,
-          cursor: syncing ? "wait" : status.migrationPending ? "not-allowed" : "pointer",
+          cursor: syncing ? "wait" : "pointer",
         }}
       >
         {syncing ? "Syncing…" : "Sync now"}
+      </button>
+      <button
+        onClick={onDisconnect}
+        style={{
+          fontSize: 12,
+          padding: "4px 12px",
+          background: "transparent",
+          border: "1px solid #2a2a30",
+          color: "#7a7a88",
+          borderRadius: 3,
+          cursor: "pointer",
+        }}
+      >
+        Disconnect
       </button>
     </div>
   );
