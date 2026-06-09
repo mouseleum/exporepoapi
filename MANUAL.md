@@ -74,13 +74,12 @@ When you wire HubSpot to `/library/companies`, every company picks up three badg
 
 One-time setup:
 
-1. In **developers.hubspot.com → Apps → Create app**, add an OAuth redirect URL of `http://localhost:3000/api/auth/hubspot/callback` (and the Vercel equivalent if you're deploying). Request the read scopes the integration uses (companies, contacts, deals, owners, pipelines, emails).
-2. Put the resulting **Client ID** + **Client Secret** into `.env.local` (or Vercel env) as `HUBSPOT_CLIENT_ID` / `HUBSPOT_CLIENT_SECRET`.
+1. In your HubSpot CRM portal: **Settings (gear) → Integrations → Private Apps → Create a private app**. (Requires Super Admin on the portal.) On the **Scopes** tab, grant read scopes for: `crm.objects.companies.read`, `crm.objects.contacts.read`, `crm.objects.deals.read`, `crm.objects.owners.read`, `crm.schemas.deals.read`, `sales-email-read`. Generate the token.
+2. Put the token in `.env.local` (and Vercel env) as `HUBSPOT_ACCESS_TOKEN`. Optionally set `HUBSPOT_OWNER_EMAIL` to your HubSpot login email — needed for met-by-you vs met-by-team. Without it, every engagement is read as "Team".
 3. Apply migration `db/migrations/0009_hubspot_oauth_and_signals.sql` in the Supabase SQL Editor.
-4. Open `/library/companies` → strip at the top says **HubSpot · Not connected**. Click **Connect** → HubSpot consent screen → redirected back.
-5. Click **Sync now**. Sync iterates per matched company; full portals can take a minute. When it settles, the strip shows "Last synced just now" and matching rows light up with badges.
+4. Open `/library/companies`. The strip at the top should say **HubSpot · Connected as <your email> · Last synced never**. Click **Sync now** — sync iterates per matched company; full portals can take a minute. When it settles, the strip shows "Last synced just now" and matching rows light up with badges.
 
-Filter chips for **Met by you / Met by team / In pipeline / No HubSpot** let you slice the Library by engagement state — useful for working an exhibitor list before a show. Clicking **Disconnect** clears the token; the signals stay visible until the next sync.
+Filter chips for **Met by you / Met by team / In pipeline / No HubSpot** let you slice the Library by engagement state — useful for working an exhibitor list before a show. To rotate the token, replace the env var; HubSpot's Private Apps page lets you rotate it on demand.
 
 ---
 

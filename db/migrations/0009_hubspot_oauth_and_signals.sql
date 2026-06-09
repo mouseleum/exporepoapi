@@ -1,31 +1,13 @@
 -- 0009_hubspot_oauth_and_signals.sql
--- Phase 9 (HubSpot enrichment): OAuth-installed integration that pulls
--- HubSpot Companies + their associated Deals/Engagements/Owners, matches
--- against companies.website by registrable domain, and writes per-company
--- signals (met_by_me / met_by_team / in_pipeline) to a side table.
+-- Phase 9 (HubSpot enrichment): per-company signals (met_by_me / met_by_team
+-- / in_pipeline + last engagement + latest open deal) materialized into a
+-- side table that /library/companies LEFT JOINs against.
 --
--- Two tables:
---   1. hubspot_oauth_tokens — keyed by portal_id (HubSpot hub id). Single
---      row in practice today (one user); table is keyed by portal so
---      multi-portal expansion later is a non-breaking change.
---   2. company_hubspot_signals — one row per matched companies.id, holding
---      the booleans the Library UI renders as badges + filter chips, plus
---      a few diagnostic fields (matched_domain, last_engagement_at, latest
---      open deal stage/amount).
+-- Auth runs through a HubSpot Private App bearer token in env
+-- (HUBSPOT_ACCESS_TOKEN), not OAuth — see lib/hubspot/auth.ts. There is no
+-- token table in this schema; the token is configuration, not data.
 --
 -- Apply manually via Supabase SQL Editor.
-
-create table if not exists hubspot_oauth_tokens (
-  portal_id              bigint primary key,
-  access_token           text         not null,
-  refresh_token          text         not null,
-  expires_at             timestamptz  not null,
-  scope                  text         not null,
-  current_user_owner_id  text,
-  current_user_email     text,
-  created_at             timestamptz  not null default now(),
-  updated_at             timestamptz  not null default now()
-);
 
 create table if not exists company_hubspot_signals (
   company_id                 uuid primary key references companies(id) on delete cascade,
