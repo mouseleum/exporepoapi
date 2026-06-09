@@ -5,6 +5,7 @@ import {
   buildAuthorizeUrl,
   deriveRedirectUri,
   getValidAccessToken,
+  lookupOwnerIdByEmail,
   type TokenRow,
 } from "../lib/hubspot/auth";
 
@@ -191,5 +192,40 @@ describe("getValidAccessToken", () => {
     const result = await getValidAccessToken(store.supabase);
     expect(result?.accessToken).toBe("fresh");
     expect(store.upserts).toHaveLength(1);
+  });
+});
+
+describe("lookupOwnerIdByEmail", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns the owner id on a match", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ results: [{ id: "owner-9", email: "me@example.com" }] }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    expect(await lookupOwnerIdByEmail("tok", "me@example.com")).toBe("owner-9");
+  });
+
+  it("returns null when the user is genuinely not an owner", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ results: [] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    expect(await lookupOwnerIdByEmail("tok", "me@example.com")).toBeNull();
+  });
+
+  it("throws on HTTP errors instead of masking them as not-found", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("boom", { status: 503 }),
+    );
+    await expect(lookupOwnerIdByEmail("tok", "me@example.com")).rejects.toThrow(
+      /owners lookup 503/,
+    );
   });
 });

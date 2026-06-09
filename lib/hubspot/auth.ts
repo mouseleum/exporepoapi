@@ -127,7 +127,13 @@ export async function lookupOwnerIdByEmail(
   const res = await fetch(u.toString(), {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // Null is reserved for "user is genuinely not an owner" — an HTTP failure
+    // here must abort the OAuth callback, otherwise a null owner_id gets
+    // stored and every engagement is silently tagged met-by-team forever.
+    const text = await res.text();
+    throw new Error(`HubSpot owners lookup ${res.status}: ${text.slice(0, 300)}`);
+  }
   const data = (await res.json()) as { results?: Array<{ id: string; email: string }> };
   return data.results?.[0]?.id ?? null;
 }

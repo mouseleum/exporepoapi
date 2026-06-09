@@ -22,7 +22,7 @@ type FilterKind =
   | string;
 
 type HubspotStatus =
-  | { connected: false }
+  | { connected: false; migrationPending?: boolean }
   | {
       connected: true;
       portalId: number;
@@ -471,26 +471,38 @@ function HubspotStrip({
   };
 
   if (!status.connected) {
+    const migrationPending = status.migrationPending === true;
     return (
       <div style={baseStyle}>
         <span style={{ color: "#7a7a88" }}>
-          HubSpot · <strong style={{ color: "#cfcfd6" }}>Not connected</strong>
+          HubSpot ·{" "}
+          <strong style={{ color: migrationPending ? "#ffaa00" : "#cfcfd6" }}>
+            {migrationPending ? "Migration pending" : "Not connected"}
+          </strong>
         </span>
+        {migrationPending && (
+          <span style={{ color: "#7a7a88" }}>
+            apply <code>db/migrations/0009_hubspot_oauth_and_signals.sql</code> in
+            the Supabase SQL Editor, then reload
+          </span>
+        )}
         <span style={{ flex: 1 }} />
-        <a
-          href="/api/auth/hubspot/connect"
-          style={{
-            fontSize: 12,
-            padding: "4px 12px",
-            background: "#00e5a022",
-            border: "1px solid #00e5a066",
-            color: "#00e5a0",
-            borderRadius: 3,
-            textDecoration: "none",
-          }}
-        >
-          Connect
-        </a>
+        {!migrationPending && (
+          <a
+            href="/api/auth/hubspot/connect"
+            style={{
+              fontSize: 12,
+              padding: "4px 12px",
+              background: "#00e5a022",
+              border: "1px solid #00e5a066",
+              color: "#00e5a0",
+              borderRadius: 3,
+              textDecoration: "none",
+            }}
+          >
+            Connect
+          </a>
+        )}
       </div>
     );
   }

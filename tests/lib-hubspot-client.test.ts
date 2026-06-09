@@ -219,4 +219,24 @@ describe("retry behavior", () => {
     expect(out).toEqual([]);
     expect(call).toBe(2);
   }, 10_000);
+
+  it("falls back to a bounded delay when Retry-After is an HTTP-date", async () => {
+    let call = 0;
+    mockFetch(() => {
+      call++;
+      if (call === 1) {
+        return new Response("rate", {
+          status: 429,
+          headers: { "retry-after": "Wed, 21 Oct 2026 07:28:00 GMT" },
+        });
+      }
+      return jsonResponse({ results: [] });
+    });
+    const started = Date.now();
+    const out = await searchCompaniesByDomain("tok", ["x.com"]);
+    expect(out).toEqual([]);
+    expect(call).toBe(2);
+    // Pre-fix, sleep(NaN) resolved immediately; the fix guarantees >= 1s.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(900);
+  }, 10_000);
 });

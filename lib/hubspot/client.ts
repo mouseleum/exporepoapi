@@ -67,8 +67,12 @@ async function hubspotFetch(
   });
 
   if (res.status === 429 && attempt < 4) {
+    // Retry-After may be an HTTP-date (RFC 7231) — Number() then yields NaN,
+    // which would propagate through Math.max/min and make sleep() return
+    // immediately. Fall back to 1s rather than retrying with zero backoff.
     const retryAfter = Number(res.headers.get("retry-after") ?? "1");
-    const delayMs = Math.max(1000, Math.min(20_000, retryAfter * 1000));
+    const seconds = Number.isFinite(retryAfter) ? retryAfter : 1;
+    const delayMs = Math.max(1000, Math.min(20_000, seconds * 1000));
     await sleep(delayMs);
     return hubspotFetch(accessToken, url, init, attempt + 1);
   }
