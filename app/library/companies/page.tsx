@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Header } from "@/components/Header";
 import { TopNav } from "@/components/TopNav";
 import { StatusBox } from "@/components/StatusBox";
@@ -65,6 +65,26 @@ export default function CompaniesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hubspot, setHubspot] = useState<HubspotStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // "/" focuses search from anywhere on the page (unless already typing).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      const tag = (el?.tagName ?? "").toLowerCase();
+      const typing =
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        (el instanceof HTMLElement && el.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   async function reloadHubspotStatus(): Promise<void> {
     try {
@@ -299,13 +319,42 @@ export default function CompaniesPage() {
         </div>
 
         <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-          <input
-            type="search"
-            placeholder="Search by name or alias…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ padding: "8px 12px", fontSize: 14 }}
-          />
+          <div className="company-search">
+            <svg
+              aria-hidden="true"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              ref={searchRef}
+              type="search"
+              aria-label="Search companies"
+              placeholder={
+                stats.total > 0
+                  ? `Search ${stats.total.toLocaleString("en")} companies by name or alias…`
+                  : "Search by name or alias…"
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search ? (
+              <span className="search-count">
+                {filtered.length.toLocaleString("en")}{" "}
+                {filtered.length === 1 ? "match" : "matches"}
+              </span>
+            ) : (
+              <span className="search-kbd" title="Press / to search">/</span>
+            )}
+          </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <FilterChip active={filter === "all"} onClick={() => setFilter("all")}>
               All ({stats.total})
