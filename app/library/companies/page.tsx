@@ -9,6 +9,10 @@ import {
   overrideCompanyCountry,
 } from "@/app/library/companies/actions";
 import type { CompanyRow } from "@/lib/library/companies-queries";
+import {
+  buildCompanySearchIndex,
+  searchCompanies,
+} from "@/lib/library/company-search";
 import type { Status } from "@/lib/types";
 
 type FilterKind =
@@ -204,9 +208,10 @@ export default function CompaniesPage() {
     return { total, resolved, missing, overrides, top, matched, metByMe, metByTeam, inPipeline };
   }, [rows]);
 
+  const searchIndex = useMemo(() => buildCompanySearchIndex(rows), [rows]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+    const chipPass = (r: CompanyRow): boolean => {
       if (filter === "missing" && r.country) return false;
       if (filter === "overrides" && r.country_confidence !== "override") return false;
       if (filter === "hs_met_me" && !r.hubspot?.met_by_me) return false;
@@ -222,15 +227,13 @@ export default function CompaniesPage() {
         filter !== "hs_in_pipeline" &&
         filter !== "hs_no_match";
       if (isCountryFilter && r.country !== filter) return false;
-      if (!q) return true;
-      if (r.name.toLowerCase().includes(q)) return true;
-      if (r.name_normalized.includes(q)) return true;
-      for (const a of r.aliases) {
-        if (a.toLowerCase().includes(q)) return true;
-      }
-      return false;
-    });
-  }, [rows, search, filter]);
+      return true;
+    };
+    return searchCompanies(
+      searchIndex.filter((e) => chipPass(e.row)),
+      search,
+    );
+  }, [searchIndex, search, filter]);
 
   const VISIBLE = 200;
   const visible = filtered.slice(0, VISIBLE);
@@ -340,8 +343,8 @@ export default function CompaniesPage() {
               aria-label="Search companies"
               placeholder={
                 stats.total > 0
-                  ? `Search ${stats.total.toLocaleString("en")} companies by name or alias…`
-                  : "Search by name or alias…"
+                  ? `Search ${stats.total.toLocaleString("en")} companies by name, event, or country…`
+                  : "Search by name, event, or country…"
               }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
