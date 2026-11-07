@@ -10,9 +10,11 @@ const ALLOWED_MODELS = new Set<string>([
 ]);
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 
-// Tools the client is allowed to ask for. Web search is the only one in use
-// today (components/guide/ListGuideTab.tsx sends web_search_20250305). New
-// tools require a code change here, by design.
+// Tools the client is allowed to ask for. Nothing in the app sends tools any
+// more — the List Guide was the only caller, and lib/api-client.ts can no
+// longer pass them. The gate stays because this route is reachable by a direct
+// POST, not only through apiFetch: an empty allowlist here would widen it.
+// New tools require a code change, by design.
 const ALLOWED_TOOL_TYPES = new Set<string>(["web_search_20250305"]);
 
 // Hard caps to bound damage from a misbehaving (or malicious) client.

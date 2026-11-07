@@ -97,46 +97,6 @@ header {
   letter-spacing: 0.05em; margin-top: 2px;
 }
 
-/* Tab nav */
-.tab-nav {
-  display: flex;
-  gap: 4px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 4px;
-  margin-bottom: 48px;
-  animation: fadeUp 0.5s 0.05s ease both;
-}
-.tab-btn {
-  flex: 1;
-  padding: 10px 16px;
-  border-radius: 7px;
-  font-family: var(--font-syne);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  color: var(--color-muted2);
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-}
-.tab-btn:hover { color: var(--color-text); }
-.tab-btn.active {
-  background: var(--color-surface2);
-  color: var(--color-text);
-  border: 1px solid var(--color-border2);
-}
-.tab-btn.active svg { color: var(--color-accent-blue); }
-
-/* Panels */
-.panel { display: none; }
-.panel.active { display: block; }
-
 /* Hero */
 .hero {
   margin-bottom: 40px;
@@ -339,62 +299,6 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
 .score-bar-wrap { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
 .score-bar { height: 3px; border-radius: 2px; background: var(--color-border2); width: 48px; overflow: hidden; }
 .score-bar-fill { height: 100%; border-radius: 2px; }
-
-/* Guide panel */
-.guide-hero { margin-bottom: 32px; animation: fadeUp 0.5s 0.1s ease both; }
-.guide-hero h1 { font-size: clamp(28px, 4vw, 42px); font-weight: 800; letter-spacing: -1px; margin-bottom: 10px; line-height: 1.1; }
-.guide-hero p { font-size: 15px; color: var(--color-muted2); line-height: 1.6; }
-
-.guide-input-section { animation: fadeUp 0.5s 0.2s ease both; margin-bottom: 24px; }
-.input-row { display: flex; gap: 8px; }
-.url-input {
-  flex: 1; background: var(--color-surface); border: 1px solid var(--color-border2);
-  border-radius: 10px; padding: 12px 16px;
-  font-family: var(--font-mono); font-size: 13px; color: var(--color-text); outline: none;
-}
-.url-input:focus { border-color: var(--color-accent-blue); }
-.url-input::placeholder { color: var(--color-muted); }
-.hint { font-family: var(--font-mono); font-size: 11px; color: var(--color-muted); margin-top: 8px; }
-
-.guide-result { margin-top: 28px; animation: fadeUp 0.4s ease both; }
-.result-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; }
-.result-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px; border-bottom: 1px solid var(--color-border); background: var(--color-surface2);
-}
-.result-label { font-family: var(--font-mono); font-size: 10px; color: var(--color-muted); letter-spacing: 0.08em; text-transform: uppercase; }
-.result-site { font-family: var(--font-mono); font-size: 11px; color: var(--color-accent-blue); }
-.result-body { padding: 24px; }
-.guide-meta { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-.guide-badge {
-  font-family: var(--font-mono); font-size: 10px; color: var(--color-muted2);
-  background: var(--color-surface2); border: 1px solid var(--color-border);
-  border-radius: 4px; padding: 3px 8px; letter-spacing: 0.05em; text-transform: uppercase;
-}
-
-.steps { display: flex; flex-direction: column; gap: 16px; }
-.step { display: flex; gap: 14px; align-items: flex-start; }
-.step-num {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: rgba(56,182,255,0.1); border: 1px solid rgba(56,182,255,0.25);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
-  color: var(--color-accent-blue); flex-shrink: 0; margin-top: 2px;
-}
-.step-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-.step-desc { font-size: 13px; color: var(--color-muted2); line-height: 1.6; }
-.step-desc code {
-  font-family: var(--font-mono); font-size: 12px;
-  background: var(--color-surface2); border: 1px solid var(--color-border);
-  border-radius: 4px; padding: 1px 6px; color: var(--color-accent);
-}
-
-.tip-box {
-  margin-top: 20px; padding: 14px 16px;
-  background: rgba(212,255,71,0.05); border: 1px solid rgba(212,255,71,0.2);
-  border-radius: 8px; font-size: 13px; color: var(--color-muted2); line-height: 1.6;
-}
-.tip-box strong { color: var(--color-accent); }
 
 /* Status */
 .status-box {
@@ -899,10 +803,7 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
 
 @media (max-width: 600px) {
   .wrap { padding: 32px 20px 60px; }
-  .col-grid { grid-template-columns: 1fr; }
-  .hero h1, .guide-hero h1 { font-size: 28px; }
-  .input-row { flex-direction: column; }
-  .tab-btn span { display: none; }
+  .hero h1 { font-size: 28px; }
   .event-add-grid { grid-template-columns: 1fr; }
 }
 

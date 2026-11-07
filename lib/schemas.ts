@@ -57,19 +57,6 @@ export const ExtractedCompaniesSchema = z.object({
   companies: z.array(ExtractedCompanySchema),
 });
 
-export const GuideStepSchema = z.object({
-  title: z.string(),
-  description: z.string(),
-});
-
-export const GuideObjectSchema = z.object({
-  site_name: z.string().optional().default(""),
-  platform: z.string().optional().default(""),
-  difficulty: z.string().optional().default(""),
-  steps: z.array(GuideStepSchema).default([]),
-  tip: z.string().optional().nullable(),
-});
-
 export const CompanyDbEntrySchema = z
   .object({
     normalized: z.string(),

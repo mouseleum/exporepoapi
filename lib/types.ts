@@ -33,16 +33,6 @@ export type EnrichedCompany =
     }
   | { name: string; matched: false };
 
-export type GuideStep = { title: string; description: string };
-
-export type GuideData = {
-  site_name: string;
-  platform: string;
-  difficulty: string;
-  steps: GuideStep[];
-  tip: string | null;
-};
-
 export type CompanyDbEntry = {
   normalized: string;
   raw: string[];

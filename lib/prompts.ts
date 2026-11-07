@@ -57,32 +57,4 @@ Return ONLY valid JSON, no markdown:
 Extract every company you can find. If unsure whether something is a company name, include it.`;
 }
 
-export function buildGuidePrompt(url: string): string {
-  return `You are a practical trade show research assistant for Mikael's.
-
-The user wants to download the full exhibitor list from this trade show website:
-URL: ${url}
-
-Use web search to find the exhibitor list page and analyse how the site works. Look for:
-- Direct download buttons (PDF, CSV, Excel export)
-- The platform the directory runs on (Swapcard, Coconnex, Mappedin, Explori, etc.)
-- Pagination structure
-- Any API endpoints that return exhibitor data
-
-Then generate clear step-by-step instructions to get the full exhibitor list as a file (CSV, Excel, or PDF) that can be uploaded to the Mikael's Ranker.
-
-Be specific: mention exact button names, URLs, menu items. If there's no export, suggest the most practical workaround (copy-paste, contacting the organiser, browser extension).
-
-Return ONLY valid JSON, no markdown:
-{
-  "site_name": "Name of the show",
-  "platform": "Platform name if recognisable (Swapcard, Coconnex, Mappedin, custom, etc.)",
-  "difficulty": "Easy / Medium / Hard",
-  "steps": [
-    {"title": "Short title", "description": "Clear instruction mentioning exact button names, URLs, or menu items."}
-  ],
-  "tip": "One practical tip or warning about this specific site"
-}`;
-}
-
 export type { ParsedRow };
