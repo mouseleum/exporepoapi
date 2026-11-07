@@ -2,6 +2,20 @@
 
 Faithful inventory of the existing app. The Phase 0 port to Next.js App Router + TypeScript strict must reproduce every behavior listed here. **No new features. No model upgrades. No refactors beyond what TS strict forces.** Anything labeled *risk* or *defer* is a Phase 0+ concern, not a Phase 0 task.
 
+> **Later change (2026-11-07) — the List Guide is gone.** The Tab 2 feature
+> described below was removed after Phase 0. Getting exhibitor lists off trade
+> fair directory sites now happens *outside* this repo: a Claude skill
+> (`exhibitor-list-extraction`) plus a browser bookmarklet that runs on the
+> fair's own page and downloads a CSV. The interface between acquisition and
+> scoring is a CSV file and nothing else — acquisition breaks when a fair
+> changes its directory platform, scoring changes when targeting changes, and
+> coupling them here meant a website change could force a redeploy of a
+> scoring tool.
+>
+> This document is deliberately left as the Phase 0 record of what *was*
+> ported, so the sections on Tab 2, `GuideCard.tsx` and tab switching describe
+> the app as it was in Phase 0, not as it is today.
+
 ## Current shape
 
 ```
@@ -90,7 +104,7 @@ Single `index.html`, dark-purple/lime theme, two tabs swapped via `switchTab()` 
 
 **Download CSV** button: `expotential_top${N}_targets.csv` with header `Rank,Company,Country,Hall/Booth,Employees,Industry,Score`. (Naive CSV — values wrapped in quotes but no escape for embedded `"`.)
 
-### Tab 2 — List Guide
+### Tab 2 — List Guide *(removed after Phase 0 — see the note at the top)*
 
 URL input → `/api/score` with `claude-sonnet-4-20250514`, `max_tokens: 1500`, and `tools: [{ type: 'web_search_20250305', name: 'web_search' }]`. Asks for JSON `{site_name, platform, difficulty, steps[{title,description}], tip}`. Renders styled card with platform/difficulty badges, numbered steps, optional tip box. Inline backticks in `description` get rewrapped as `<code>`.
 
