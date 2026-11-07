@@ -2,49 +2,22 @@
 
 import { useState } from "react";
 import type { AdminEventRow } from "@/lib/library/admin-queries";
-import { CSV_SOURCE } from "@/lib/library/event-source";
 
 type Props = {
   rows: AdminEventRow[];
   onToggleRomify: (id: string, value: boolean) => Promise<void>;
-  onTogglePeople: (id: string, value: boolean) => Promise<void>;
-  onToggleCountry: (id: string, value: boolean) => Promise<void>;
-  onFetch: (id: string) => Promise<void>;
-  onExtractViaAgent: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
 
-function isPeopleEnabled(cfg: unknown): boolean {
-  if (!cfg || typeof cfg !== "object") return false;
-  return !!(cfg as { includePeople?: unknown }).includePeople;
-}
-
-function isCountryEnabled(cfg: unknown): boolean {
-  if (!cfg || typeof cfg !== "object") return false;
-  return !!(cfg as { includeCountry?: unknown }).includeCountry;
-}
-
-function formatScraped(iso: string | null): string {
+// "Imported" rather than "Scraped": for a CSV event this is when the list was
+// last brought in. Rows scraped before acquisition moved out of this repo keep
+// the timestamp they had.
+function formatImported(iso: string | null): string {
   if (!iso) return "never";
   return iso.slice(0, 10);
 }
 
-function formatConfig(cfg: unknown): string {
-  if (!cfg || typeof cfg !== "object") return "—";
-  const entries = Object.entries(cfg as Record<string, unknown>);
-  if (entries.length === 0) return "—";
-  return entries.map(([k, v]) => `${k}=${String(v)}`).join(", ");
-}
-
-export function EventAdminTable({
-  rows,
-  onToggleRomify,
-  onTogglePeople,
-  onToggleCountry,
-  onFetch,
-  onExtractViaAgent,
-  onDelete,
-}: Props) {
+export function EventAdminTable({ rows, onToggleRomify, onDelete }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const handle = async (id: string, fn: () => Promise<void>) => {
@@ -68,12 +41,8 @@ export function EventAdminTable({
             <th>Slug</th>
             <th>Name</th>
             <th>Year</th>
-            <th>Family</th>
-            <th>Config</th>
             <th>Exhibitors</th>
-            <th>People</th>
-            <th>Country</th>
-            <th>Last scraped</th>
+            <th>Imported</th>
             <th>My company</th>
             <th></th>
           </tr>
@@ -81,67 +50,13 @@ export function EventAdminTable({
         <tbody>
           {rows.map((r) => {
             const busy = busyId === r.id;
-            // A CSV-imported show has no adapter, so the fetch actions below
-            // would only ever error.
-            const isCsv = r.source === CSV_SOURCE;
             return (
               <tr key={r.id}>
                 <td className="company-cell">{r.slug}</td>
                 <td>{r.name}</td>
                 <td className="hall-cell">{r.year ?? "—"}</td>
-                <td className="hall-cell">{r.source}</td>
-                <td className="industry-cell">{formatConfig(r.adapter_config)}</td>
                 <td className="hall-cell">{r.exhibitor_count}</td>
-                <td className="hall-cell">
-                  {r.source === "swapcard" ? (
-                    <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isPeopleEnabled(r.adapter_config)}
-                        disabled={busy}
-                        onChange={(e) =>
-                          handle(r.id, () =>
-                            onTogglePeople(r.id, e.target.checked),
-                          )
-                        }
-                      />
-                      <span>{r.people_count || "—"}</span>
-                    </label>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="hall-cell">
-                  {r.source === "mapyourshow" ? (
-                    <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isCountryEnabled(r.adapter_config)}
-                        disabled={busy}
-                        onChange={(e) =>
-                          handle(r.id, () =>
-                            onToggleCountry(r.id, e.target.checked),
-                          )
-                        }
-                      />
-                    </label>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="hall-cell">{formatScraped(r.scraped_at)}</td>
+                <td className="hall-cell">{formatImported(r.scraped_at)}</td>
                 <td>
                   <input
                     type="checkbox"
@@ -156,32 +71,6 @@ export function EventAdminTable({
                 </td>
                 <td>
                   <div className="event-admin-row-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={busy || isCsv}
-                      title={
-                        isCsv
-                          ? "This event's list was imported from a CSV — there is no adapter to re-fetch. Import an updated CSV instead."
-                          : undefined
-                      }
-                      onClick={() => handle(r.id, () => onFetch(r.id))}
-                    >
-                      Fetch now
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={busy || isCsv}
-                      title={
-                        isCsv
-                          ? "This event's list was imported from a CSV — there is nothing for the agent to extract."
-                          : "Queue this event for the local-extract-agent (Playwright + Haiku + local Qwen on home PC / Mac)"
-                      }
-                      onClick={() => handle(r.id, () => onExtractViaAgent(r.id))}
-                    >
-                      Extract via Agent
-                    </button>
                     <button
                       type="button"
                       className="btn btn-danger"

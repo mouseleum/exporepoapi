@@ -40,9 +40,10 @@ export async function importEventCsv(
   if (!name) throw new Error("importEventCsv: name is required");
   if (!input.csvText.trim()) throw new Error("importEventCsv: the CSV is empty");
 
-  // Don't let a CSV import take over a scraped show. ingestExhibitors upserts
-  // the event on slug, which would otherwise rewrite its source to "csv" and
-  // quietly drop it out of the refresh cron.
+  // Don't let a CSV import silently take over a show that was scraped before
+  // acquisition moved out of this repo. ingestExhibitors upserts on slug, so
+  // without this the row's historical source would be rewritten to "csv" and
+  // the only record of where that list came from would be lost.
   const { data: existing, error: existingErr } = await supabase
     .from("events")
     .select("source")
@@ -54,7 +55,7 @@ export async function importEventCsv(
   if (existing && existing.source !== CSV_SOURCE) {
     throw new Error(
       `'${slug}' already exists as a ${String(existing.source)} event. ` +
-        `Importing a CSV over it would detach it from its adapter — ` +
+        `Importing a CSV over it would overwrite that record — ` +
         `use a different slug, or delete that event first.`,
     );
   }

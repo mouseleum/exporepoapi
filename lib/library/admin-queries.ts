@@ -1,7 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "../supabase";
-import { getAdapterFactory } from "../adapters/registry";
-import { loadEventForRow, type EventRow, type LoadEventResult } from "./load-event";
 
 export type AdminEventRow = {
   id: string;
@@ -17,23 +15,14 @@ export type AdminEventRow = {
   people_count: number;
 };
 
-export type CreateEventInput = {
-  source: string;
-  slug: string;
-  name: string;
-  year: number | null;
-  source_url: string | null;
-  adapter_config: unknown;
-  romify_attending: boolean;
-};
-
+// source and adapter_config are no longer editable: a show's list comes from
+// a CSV import, which sets source itself. The columns remain on the table,
+// carrying their historical values for shows that were once scraped.
 export type UpdateEventPatch = Partial<{
-  source: string;
   slug: string;
   name: string;
   year: number | null;
   source_url: string | null;
-  adapter_config: unknown;
   romify_attending: boolean;
 }>;
 
@@ -87,41 +76,6 @@ export async function listAllAdminEvents(
   }));
 }
 
-export async function createEvent(
-  input: CreateEventInput,
-  supabase: SupabaseClient = createServiceClient(),
-): Promise<{ id: string }> {
-  if (!input.slug || !input.slug.trim()) {
-    throw new Error("createEvent: slug is required");
-  }
-  if (!input.source || !input.source.trim()) {
-    throw new Error("createEvent: source is required");
-  }
-  const { data, error } = await supabase
-    .from("events")
-    .insert({
-      source: input.source,
-      slug: input.slug,
-      name: input.name,
-      year: input.year,
-      source_url: input.source_url,
-      adapter_config: input.adapter_config ?? {},
-      romify_attending: input.romify_attending,
-    })
-    .select("id")
-    .single();
-  if (error || !data) {
-    const msg = error?.message ?? "no row returned";
-    if (error?.code === "23505" || /duplicate key|already exists/i.test(msg)) {
-      throw new Error(
-        `Slug '${input.slug}' already exists — edit/fetch the existing row instead of adding a new one.`,
-      );
-    }
-    throw new Error(`createEvent: ${msg}`);
-  }
-  return { id: data.id as string };
-}
-
 export async function updateEvent(
   id: string,
   patch: UpdateEventPatch,
@@ -140,25 +94,4 @@ export async function deleteEvent(
   if (!id) throw new Error("deleteEvent: id is required");
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) throw new Error(`deleteEvent: ${error.message}`);
-}
-
-export async function triggerEventFetch(
-  id: string,
-  supabase: SupabaseClient = createServiceClient(),
-): Promise<LoadEventResult> {
-  const { data, error } = await supabase
-    .from("events")
-    .select("source, slug, name, year, source_url, adapter_config")
-    .eq("id", id)
-    .single();
-  if (error || !data) {
-    throw new Error(`triggerEventFetch lookup: ${error?.message ?? "not found"}`);
-  }
-  const row = data as EventRow;
-  if (!getAdapterFactory(row.source)) {
-    throw new Error(
-      `triggerEventFetch: no adapter family registered for source '${row.source}'`,
-    );
-  }
-  return loadEventForRow(row, supabase);
 }

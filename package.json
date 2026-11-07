@@ -11,8 +11,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "load:apollo": "tsx scripts/load-apollo.ts",
-    "load:event": "tsx scripts/load-event.ts",
-    "refresh": "tsx scripts/refresh-events.ts",
     "import:company-db": "tsx scripts/import-company-db.ts",
     "normalize:countries": "tsx scripts/normalize-countries.ts"
   },

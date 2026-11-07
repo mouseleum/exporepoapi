@@ -1,13 +1,7 @@
-// events.source is an adapter family key for scraped shows. A show whose list
-// was imported from a CSV carries this sentinel instead.
+// The value that goes in events.source for a show imported from a CSV.
 //
-// Two consequences worth knowing:
-//   - refreshAllEvents skips any event whose source has no registered adapter
-//     family, so CSV events are left alone by the weekly cron. Nothing to
-//     special-case there.
-//   - the admin table's per-event fetch actions have no adapter to call, so
-//     they are disabled for these rows (re-import the CSV instead).
-//
-// Kept in its own module so client components can read it without pulling in
-// the Supabase client that lib/library/import-csv.ts imports.
+// Historically source was an adapter family key ("swapcard", "dimedis", …),
+// chosen per show. Those adapters are gone — acquisition happens outside this
+// repo now — so every show created from here carries this one value, and the
+// older values survive only on rows that predate the change.
 export const CSV_SOURCE = "csv";
