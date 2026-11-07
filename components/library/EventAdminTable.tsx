@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AdminEventRow } from "@/lib/library/admin-queries";
+import { CSV_SOURCE } from "@/lib/library/event-source";
 
 type Props = {
   rows: AdminEventRow[];
@@ -80,6 +81,9 @@ export function EventAdminTable({
         <tbody>
           {rows.map((r) => {
             const busy = busyId === r.id;
+            // A CSV-imported show has no adapter, so the fetch actions below
+            // would only ever error.
+            const isCsv = r.source === CSV_SOURCE;
             return (
               <tr key={r.id}>
                 <td className="company-cell">{r.slug}</td>
@@ -155,7 +159,12 @@ export function EventAdminTable({
                     <button
                       type="button"
                       className="btn btn-secondary"
-                      disabled={busy}
+                      disabled={busy || isCsv}
+                      title={
+                        isCsv
+                          ? "This event's list was imported from a CSV — there is no adapter to re-fetch. Import an updated CSV instead."
+                          : undefined
+                      }
                       onClick={() => handle(r.id, () => onFetch(r.id))}
                     >
                       Fetch now
@@ -163,8 +172,12 @@ export function EventAdminTable({
                     <button
                       type="button"
                       className="btn btn-secondary"
-                      disabled={busy}
-                      title="Queue this event for the local-extract-agent (Playwright + Haiku + local Qwen on home PC / Mac)"
+                      disabled={busy || isCsv}
+                      title={
+                        isCsv
+                          ? "This event's list was imported from a CSV — there is nothing for the agent to extract."
+                          : "Queue this event for the local-extract-agent (Playwright + Haiku + local Qwen on home PC / Mac)"
+                      }
                       onClick={() => handle(r.id, () => onExtractViaAgent(r.id))}
                     >
                       Extract via Agent

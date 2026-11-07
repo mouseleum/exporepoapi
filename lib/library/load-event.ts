@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Adapter, AdapterFactory, EventMeta } from "../adapters/types";
 import { ADAPTER_FACTORIES } from "../adapters/registry";
-import { normalizeName } from "../normalize";
+import { ingestExhibitors } from "./ingest-exhibitors";
 
 const BATCH_SIZE = 500;
 
@@ -69,89 +69,37 @@ export async function loadEventForAdapter(
 ): Promise<LoadEventResult> {
   const start = Date.now();
 
+  // Acquisition. Everything after this line is source-agnostic ingestion,
+  // shared with the CSV import path — see lib/library/ingest-exhibitors.ts.
   const exhibitors = await adapter.fetch();
 
-  const eventRow = {
-    source: adapter.meta.source,
-    slug: adapter.meta.slug,
-    name: adapter.meta.name,
-    year: adapter.meta.year,
-    source_url: adapter.meta.source_url,
-    scraped_at: new Date().toISOString(),
-  };
-
-  const { data: eventInsert, error: eventErr } = await supabase
-    .from("events")
-    .upsert(eventRow, { onConflict: "slug" })
-    .select("id")
-    .single();
-  if (eventErr || !eventInsert) {
-    throw new Error(
-      `events upsert failed for ${adapter.meta.slug}: ${eventErr?.message ?? "no row returned"}`,
-    );
-  }
-  const eventId = eventInsert.id as string;
-
-  const seen = new Set<string>();
-  const rows: Array<{
-    event_id: string;
-    raw_name: string;
-    name_normalized: string;
-    country: string | null;
-    hall: string | null;
-    booth: string | null;
-    source_id: string | null;
-  }> = [];
-  let dupes = 0;
-  for (const x of exhibitors) {
-    const name_normalized = normalizeName(x.raw_name);
-    if (seen.has(name_normalized)) {
-      dupes++;
-      continue;
-    }
-    seen.add(name_normalized);
-    rows.push({
-      event_id: eventId,
-      raw_name: x.raw_name,
-      name_normalized,
-      country: x.country ?? null,
-      hall: x.hall ?? null,
-      booth: x.booth ?? null,
-      source_id: x.source_id ?? null,
-    });
-  }
-
-  let upserted = 0;
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    const { error } = await supabase
-      .from("event_exhibitors")
-      .upsert(batch, { onConflict: "event_id,name_normalized" });
-    if (error) {
-      throw new Error(
-        `event_exhibitors upsert failed for ${adapter.meta.slug}: ${error.message}`,
-      );
-    }
-    upserted += batch.length;
-  }
+  const ingested = await ingestExhibitors(
+    {
+      source: adapter.meta.source,
+      slug: adapter.meta.slug,
+      name: adapter.meta.name,
+      year: adapter.meta.year,
+      source_url: adapter.meta.source_url,
+    },
+    exhibitors,
+    supabase,
+  );
 
   let people_upserted: number | undefined;
   if (options.includePeople && adapter.fetchPeople) {
     people_upserted = await loadPeopleForEvent(
-      eventId,
+      ingested.event_id,
       adapter,
-      rows
-        .map((r) => r.source_id)
-        .filter((id): id is string => !!id),
+      ingested.source_ids,
       supabase,
     );
   }
 
   return {
-    slug: adapter.meta.slug,
-    fetched: exhibitors.length,
-    upserted,
-    dupes,
+    slug: ingested.slug,
+    fetched: ingested.fetched,
+    upserted: ingested.upserted,
+    dupes: ingested.dupes,
     people_upserted,
     elapsed_ms: Date.now() - start,
   };

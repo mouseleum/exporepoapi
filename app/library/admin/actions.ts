@@ -32,6 +32,11 @@ import {
   quickExtract as _quickExtract,
   type QuickExtractResult,
 } from "@/lib/library/quick-extract";
+import {
+  importEventCsv as _importEventCsv,
+  type ImportEventCsvInput,
+  type ImportEventCsvResult,
+} from "@/lib/library/import-csv";
 
 export async function listAllAdminEvents(): Promise<AdminEventRow[]> {
   return _listAllAdminEvents();
@@ -98,4 +103,10 @@ export async function togglePromoted(captureId: string, promote: boolean): Promi
 
 export async function getAgentActivity(): Promise<AgentActivity> {
   return _getAgentActivity();
+}
+
+export async function importEventCsv(
+  input: ImportEventCsvInput,
+): Promise<ImportEventCsvResult> {
+  return _importEventCsv(input);
 }

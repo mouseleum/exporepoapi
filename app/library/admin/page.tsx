@@ -7,6 +7,7 @@ import { StatusBox } from "@/components/StatusBox";
 import { EventAddForm } from "@/components/library/EventAddForm";
 import { EventAdminTable } from "@/components/library/EventAdminTable";
 import { QuickExtractBar } from "@/components/library/QuickExtractBar";
+import { EventCsvImport } from "@/components/library/EventCsvImport";
 import { AgentStatusBadge } from "@/components/library/AgentStatusBadge";
 import {
   createEvent,
@@ -248,6 +249,13 @@ export default function AdminPage() {
       <AgentStatusBadge />
 
       <QuickExtractBar onJobDone={reload} />
+
+      <div className="results-section">
+        <div className="results-header">
+          <span className="results-title">Import exhibitor CSV</span>
+        </div>
+        <EventCsvImport onImported={reload} />
+      </div>
 
       <div className="results-section">
         <div className="results-header">

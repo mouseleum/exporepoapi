@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { slugify } from "@/lib/slug";
 import { z } from "zod";
 import { DimedisConfigSchema } from "@/lib/adapters/dimedis";
 import { MapYourShowConfigSchema } from "@/lib/adapters/mapyourshow";
@@ -40,18 +41,6 @@ const FAMILIES: Family[] = [
   "swapcard",
   "solar-promotion",
 ];
-
-function slugify(name: string, year: number | null): string {
-  const base = name
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  if (!year) return base;
-  return base.endsWith(`-${year}`) || base === String(year)
-    ? base
-    : `${base}-${year}`;
-}
 
 type Props = {
   onCreate: (input: CreateEventInput) => Promise<void>;
