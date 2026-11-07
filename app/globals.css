@@ -774,17 +774,6 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   outline: none;
   border-color: var(--color-accent-blue);
 }
-.event-add-checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-}
-.event-add-checkbox > span {
-  text-transform: none;
-  font-size: 13px;
-  letter-spacing: 0;
-}
 .event-add-error {
   margin-top: 12px;
   padding: 10px 14px;

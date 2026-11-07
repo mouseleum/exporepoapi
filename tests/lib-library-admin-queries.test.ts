@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  createEvent,
   deleteEvent,
   listAllAdminEvents,
-  triggerEventFetch,
   updateEvent,
 } from "../lib/library/admin-queries";
 
@@ -101,108 +99,6 @@ describe("listAllAdminEvents", () => {
   });
 });
 
-describe("createEvent", () => {
-  function makeInsertSupabase(insertImpl: (row: unknown) => {
-    data: unknown;
-    error: { message: string } | null;
-  }) {
-    return {
-      from: vi.fn((table: string) => {
-        if (table !== "events") throw new Error(`unexpected table: ${table}`);
-        return {
-          insert: vi.fn((row: unknown) => ({
-            select: () => ({
-              single: async () => insertImpl(row),
-            }),
-          })),
-        };
-      }),
-    } as unknown as SupabaseClient;
-  }
-
-  it("inserts the event and returns its id", async () => {
-    let captured: unknown = null;
-    const supabase = makeInsertSupabase((row) => {
-      captured = row;
-      return { data: { id: "new-id" }, error: null };
-    });
-    const out = await createEvent(
-      {
-        source: "dimedis",
-        slug: "x-2026",
-        name: "X 2026",
-        year: 2026,
-        source_url: "https://x.example/",
-        adapter_config: { domain: "x.example" },
-        romify_attending: true,
-      },
-      supabase,
-    );
-    expect(out).toEqual({ id: "new-id" });
-    expect(captured).toMatchObject({
-      source: "dimedis",
-      slug: "x-2026",
-      adapter_config: { domain: "x.example" },
-      romify_attending: true,
-    });
-  });
-
-  it("rejects empty slug or source", async () => {
-    const supabase = makeInsertSupabase(() => ({
-      data: { id: "x" },
-      error: null,
-    }));
-    await expect(
-      createEvent(
-        {
-          source: "dimedis",
-          slug: "",
-          name: "n",
-          year: null,
-          source_url: null,
-          adapter_config: {},
-          romify_attending: false,
-        },
-        supabase,
-      ),
-    ).rejects.toThrow(/slug is required/);
-    await expect(
-      createEvent(
-        {
-          source: "",
-          slug: "x",
-          name: "n",
-          year: null,
-          source_url: null,
-          adapter_config: {},
-          romify_attending: false,
-        },
-        supabase,
-      ),
-    ).rejects.toThrow(/source is required/);
-  });
-
-  it("propagates supabase errors", async () => {
-    const supabase = makeInsertSupabase(() => ({
-      data: null,
-      error: { message: "duplicate slug" },
-    }));
-    await expect(
-      createEvent(
-        {
-          source: "dimedis",
-          slug: "x-2026",
-          name: "X",
-          year: 2026,
-          source_url: null,
-          adapter_config: {},
-          romify_attending: false,
-        },
-        supabase,
-      ),
-    ).rejects.toThrow(/createEvent: duplicate slug/);
-  });
-});
 
 describe("updateEvent", () => {
   function makeUpdateSupabase(error: { message: string } | null = null) {
@@ -267,50 +163,5 @@ describe("deleteEvent", () => {
       }),
     } as unknown as SupabaseClient;
     await expect(deleteEvent("", supabase)).rejects.toThrow(/id is required/);
-  });
-});
-
-describe("triggerEventFetch", () => {
-  it("rejects when the row's source family is not registered", async () => {
-    const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: async () => ({
-              data: {
-                source: "ghost",
-                slug: "ghost-2026",
-                name: "g",
-                year: 2026,
-                source_url: null,
-                adapter_config: {},
-              },
-              error: null,
-            }),
-          })),
-        })),
-      })),
-    } as unknown as SupabaseClient;
-    await expect(triggerEventFetch("e1", supabase)).rejects.toThrow(
-      /no adapter family registered for source 'ghost'/,
-    );
-  });
-
-  it("propagates lookup errors", async () => {
-    const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: async () => ({
-              data: null,
-              error: { message: "row not found" },
-            }),
-          })),
-        })),
-      })),
-    } as unknown as SupabaseClient;
-    await expect(triggerEventFetch("missing", supabase)).rejects.toThrow(
-      /row not found/,
-    );
   });
 });

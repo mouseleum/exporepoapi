@@ -1,7 +1,6 @@
 // The ingestion half of getting an exhibitor list into the Library: upsert the
 // event, dedupe the rows, write them in batches. Deliberately source-agnostic
-// — it does not know or care whether the rows came from a site adapter or from
-// a CSV a human downloaded off the fair's own page.
+// — it takes rows and does not care where they came from.
 //
 // Acquisition (finding and extracting a list) lives OUTSIDE this repo; the
 // interface between the two halves is a list of rows. This module is the
@@ -34,8 +33,10 @@ export type IngestResult = {
   fetched: number;
   upserted: number;
   dupes: number;
-  // source_ids of the rows that survived deduping, in order. Only the adapter
-  // path uses these (to map people back onto exhibitors); a CSV has none.
+  // source_ids of the rows that survived deduping, in order. Nothing reads
+  // these today: they existed so the Swapcard adapter could map people back
+  // onto exhibitors. Kept because event_exhibitors.source_id is still a
+  // column and a future non-CSV source would want the same hook.
   source_ids: string[];
 };
 
