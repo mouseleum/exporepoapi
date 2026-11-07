@@ -11,7 +11,6 @@ export type ApiFetchBody = {
   prompt: string;
   max_tokens?: number;
   model?: string;
-  tools?: unknown[];
 };
 
 export async function apiFetch(
@@ -27,7 +26,6 @@ export async function apiFetch(
           prompt: body.prompt,
           max_tokens: body.max_tokens,
           model: body.model,
-          tools: body.tools ?? undefined,
         }),
       });
       if (res.status === 529 || res.status === 429) {
