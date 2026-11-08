@@ -66,6 +66,7 @@ export type ExtractionJobListRow = ExtractionJobView & {
   event_name: string;
 };
 
+/** Activity of local-extract-agent only (agent = 'legacy'); calendar jobs for exhibitor-browser-agent are excluded. */
 export type AgentActivity = {
   /** ISO timestamp of the most recent extraction_jobs row claimed by any worker, or null if nothing's ever been claimed. */
   last_claim_at: string | null;
@@ -87,6 +88,7 @@ export async function getAgentActivity(
     supabase
       .from("extraction_jobs")
       .select("claimed_at, worker_id")
+      .eq("agent", "legacy")
       .not("claimed_at", "is", null)
       .order("claimed_at", { ascending: false })
       .limit(1)
@@ -94,14 +96,17 @@ export async function getAgentActivity(
     supabase
       .from("extraction_jobs")
       .select("*", { count: "exact", head: true })
+      .eq("agent", "legacy")
       .eq("status", "pending"),
     supabase
       .from("extraction_jobs")
       .select("*", { count: "exact", head: true })
+      .eq("agent", "legacy")
       .eq("status", "claimed"),
     supabase
       .from("extraction_jobs")
       .select("*", { count: "exact", head: true })
+      .eq("agent", "legacy")
       .eq("status", "done")
       .gte("completed_at", oneHourAgo),
   ]);
