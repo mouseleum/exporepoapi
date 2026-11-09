@@ -760,6 +760,7 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
 .event-add-field input[type="text"],
 .event-add-field input[type="url"],
 .event-add-field input[type="number"],
+.event-add-field input[type="file"],
 .event-add-field select {
   background: var(--color-bg2);
   color: var(--color-text);
@@ -794,6 +795,20 @@ tbody td { padding: 11px 16px; color: var(--color-text); font-size: 13px; }
   font-size: 13px;
 }
 .event-add-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
+
+/* CSV import result line */
+.csv-import-result {
+  margin-top: 14px; padding: 12px 14px;
+  background: var(--color-surface2); border: 1px solid var(--color-border);
+  border-radius: 8px; font-family: var(--font-mono);
+  font-size: 12px; color: var(--color-muted2); line-height: 1.6;
+}
+.csv-import-result strong { color: var(--color-text); }
+.csv-import-result code {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: 4px; padding: 1px 5px; color: var(--color-accent);
+}
+.csv-import-cols { margin-top: 6px; font-size: 11px; color: var(--color-muted); }
 
 .event-admin-row-actions {
   display: flex;
