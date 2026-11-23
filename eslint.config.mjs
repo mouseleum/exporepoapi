@@ -13,6 +13,8 @@ export default [
       "next-env.d.ts",
       "*.config.mjs",
       "*.config.ts",
+      // Supabase Edge Functions run on Deno (npm:/jsr: imports); checked with `deno check`.
+      "supabase/**",
     ],
   },
   js.configs.recommended,

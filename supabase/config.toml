@@ -1,0 +1,7 @@
+# Supabase CLI config, used only to serve/deploy Edge Functions from this repo.
+# Database migrations live in db/migrations/ and are applied by hand.
+project_id = "hihhgpzcklusonxnbfcn"
+
+[functions.expo-calendar-mcp]
+# Public, no-sign-in MCP server (read-only, anon key + RLS).
+verify_jwt = false
